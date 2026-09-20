@@ -1,0 +1,138 @@
+{
+  "project": {
+    "name": "Swap & Modernization",
+    "country": "Lebanon",
+    "prefix": "LB",
+    "day1Arrive": "07:00",
+    "day2Arrive": "07:00",
+    "maxHours": 11,
+    "startDate": "2026-10-05",
+    "teams": 3,
+    "sectors": 3,
+    "legacyRRU": 6,
+    "weekend": "sun",
+    "newBB": "RP6655",
+    "oldBB": "BB5212",
+    "regions": ""
+  },
+  "equipment": [
+    {
+      "model": "Radio 4486 B8B20B28",
+      "kind": "radio",
+      "min": 20
+    },
+    {
+      "model": "Radio 4490 B1B3",
+      "kind": "radio",
+      "min": 20
+    },
+    {
+      "model": "Radio 6646 B8B20B28",
+      "kind": "radio",
+      "min": 40
+    },
+    {
+      "model": "AIR 6419 B42",
+      "kind": "air",
+      "min": 60
+    },
+    {
+      "model": "AIR 3219 B42",
+      "kind": "air",
+      "min": 45
+    },
+    {
+      "model": "AIR 3255 B78AA",
+      "kind": "air",
+      "min": 40
+    }
+  ],
+  "unit": {
+    "cableRadio": 15,
+    "cableAIR": 20,
+    "dismantleRRU": 20,
+    "jumperSector": 30
+  },
+  "fixed": {
+    "access1": 15,
+    "safety1": 30,
+    "precheck": 30,
+    "material": 30,
+    "rigging1": 30,
+    "rpInstall": 60,
+    "rpPower": 30,
+    "rpSw": 90,
+    "tn": 45,
+    "powerRadios": 30,
+    "close1": 20,
+    "access2": 15,
+    "safety2": 15,
+    "rigging2": 15,
+    "precut": 20,
+    "gng": 10,
+    "powerOff": 10,
+    "rehome": 30,
+    "txmig": 15,
+    "integ": 60,
+    "rf": 20,
+    "onair": 10,
+    "powerAir": 30,
+    "nrInteg": 30,
+    "nrUnlock": 15,
+    "svc": 45,
+    "ext": 30,
+    "dismBB": 30,
+    "dress": 45,
+    "pack": 60,
+    "rsc": 60,
+    "snags": 30,
+    "close2": 15
+  },
+  "types": [
+    {
+      "name": "Type-1",
+      "sites": 5,
+      "lowModel": "Radio 4486 B8B20B28",
+      "lowQty": 3,
+      "midModel": "Radio 4490 B1B3",
+      "midQty": 3,
+      "airModel": "AIR 6419 B42",
+      "airQty": 3,
+      "reuseCabling": false
+    },
+    {
+      "name": "Type-2",
+      "sites": 14,
+      "lowModel": "Radio 4486 B8B20B28",
+      "lowQty": 3,
+      "midModel": "Radio 4490 B1B3",
+      "midQty": 3,
+      "airModel": "AIR 3219 B42",
+      "airQty": 3,
+      "reuseCabling": false
+    },
+    {
+      "name": "Type-3",
+      "sites": 1,
+      "lowModel": "Radio 6646 B8B20B28",
+      "lowQty": 1,
+      "midModel": "Radio 4490 B1B3",
+      "midQty": 3,
+      "airModel": "AIR 3219 B42",
+      "airQty": 3,
+      "reuseCabling": false
+    },
+    {
+      "name": "Type-4",
+      "sites": 5,
+      "lowModel": "Radio 4486 B8B20B28",
+      "lowQty": 3,
+      "midModel": "Radio 4490 B1B3",
+      "midQty": 3,
+      "airModel": "AIR 3255 B78AA",
+      "airQty": 3,
+      "reuseCabling": false
+    }
+  ],
+  "siteList": ""
+}
