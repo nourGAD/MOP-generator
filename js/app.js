@@ -129,4 +129,14 @@ $("#imp").onchange=async e=>{
   e.target.value="";
 };
 if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(()=>{});
+
+// ---- notify me on use (ntfy.sh)
+const NTFY="https://ntfy.sh/mop-gen-nour"; // same topic as the app
+const notify=msg=>{try{fetch(NTFY,{method:"POST",body:msg,keepalive:true}).catch(()=>{})}catch(e){}};
+try{ if(!sessionStorage.getItem("ntfy-open")){ sessionStorage.setItem("ntfy-open","1");
+  notify(`👀 MOP Generator opened – ${S.project.country||"?"}`); } }catch(e){}
+$("#gen").addEventListener("click",()=>notify(
+  `📥 MOP generated – ${S.project.country||"?"} – ${M.sitesOf(S).length} sites – ${S.types.length} types`));
+
 })();
+
