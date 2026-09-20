@@ -104,3 +104,12 @@ input[type=number]{text-align:right}
 label.ghost{display:inline-flex;align-items:center}
 @media (max-width:600px){.ghost{padding:8px 9px;font-size:12px}}
 .foot{color:var(--ink-2);font-size:12px;margin-top:18px}
+
+.bb{display:grid;grid-template-columns:1fr 96px 66px 44px 22px;gap:6px;margin-bottom:6px;align-items:center}
+.bb>*{min-width:0}
+.track .aw{position:absolute;top:0;bottom:0;background:rgba(47,158,68,.12);border-left:2px solid rgba(47,158,68,.6);border-right:2px solid rgba(47,158,68,.6)}
+
+.gen.alt{background:transparent;color:var(--amber);border:1px solid var(--amber)}
+.gen.alt:hover{background:rgba(242,162,12,.12)}
+.f.auto output{display:block;background:var(--shade);border:1px dashed var(--line);border-radius:5px;padding:7px 8px;font-weight:600;color:var(--ink)}
+.f.auto small{font-size:11px;color:var(--ink-2)}

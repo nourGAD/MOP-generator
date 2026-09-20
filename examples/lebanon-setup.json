@@ -3,18 +3,32 @@
     "name": "Swap & Modernization",
     "country": "Lebanon",
     "prefix": "LB",
-    "day1Arrive": "07:00",
-    "day2Arrive": "07:00",
+    "arrive": "07:00",
     "maxHours": 11,
+    "daysPerSite": 2,
+    "outStart": "08:00",
+    "outMax": 4,
     "startDate": "2026-10-05",
     "teams": 3,
     "sectors": 3,
     "legacyRRU": 6,
     "weekend": "sun",
-    "newBB": "RP6655",
-    "oldBB": "BB5212",
     "regions": ""
   },
+  "basebands": [
+    {
+      "model": "RP6655",
+      "status": "New",
+      "tech": "4G+5G",
+      "qty": 1
+    },
+    {
+      "model": "BB5212",
+      "status": "Reused",
+      "tech": "3G",
+      "qty": 1
+    }
+  ],
   "equipment": [
     {
       "model": "Radio 4486 B8B20B28",
@@ -54,20 +68,20 @@
     "jumperSector": 30
   },
   "fixed": {
-    "access1": 15,
+    "access": 15,
     "safety1": 30,
     "precheck": 30,
     "material": 30,
     "rigging1": 30,
-    "rpInstall": 60,
-    "rpPower": 30,
-    "rpSw": 90,
+    "bbInstall": 60,
+    "bbPower": 30,
+    "bbSw": 90,
     "tn": 45,
     "powerRadios": 30,
-    "close1": 20,
-    "access2": 15,
-    "safety2": 15,
-    "rigging2": 15,
+    "closeDay": 20,
+    "accessN": 15,
+    "safetyN": 15,
+    "riggingN": 15,
     "precut": 20,
     "gng": 10,
     "powerOff": 10,
@@ -83,10 +97,11 @@
     "ext": 30,
     "dismBB": 30,
     "dress": 45,
+    "kpi": 45,
     "pack": 60,
     "rsc": 60,
     "snags": 30,
-    "close2": 15
+    "closeSite": 15
   },
   "types": [
     {

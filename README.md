@@ -43,7 +43,7 @@ index.html              page
 css/style.css           styles (light/dark)
 js/core.js              scheduling engine + Excel builder
 js/app.js               user interface
-vendor/exceljs.min.js   ExcelJS 4.4.0 (MIT) – bundled, no CDN needed
+vendor/                 ExcelJS 4.4.0, jsPDF 2.5.1, jspdf-autotable 3.8.2 (all MIT) – bundled, no CDN needed
 sw.js, manifest.webmanifest, icons/   installable / offline
 Dockerfile, nginx.conf, docker-compose.yml
 .github/workflows/deploy-pages.yml
@@ -54,3 +54,17 @@ Dockerfile, nginx.conf, docker-compose.yml
 - Durations are planning assumptions; tune them after the first sites.
 - Day 2 start time follows the customer outage approval – change it and all Day 2 times and the outage window move.
 - Excel charts are not generated (library limitation); the app shows the timeline instead.
+
+## Changelog
+
+**v1.2.0**
+- Cutover-day arrival is automatic: approved outage start minus the pre-outage prep (access, safety, rigging/pre-check, GO/NO-GO) – no idle team
+- New **PDF** button: short, easy-to-read MOP for the field team (key facts, site types at a glance, one page per type and day with a timeline). Full detail stays in Excel
+- PDF libraries bundled: jsPDF 2.5.1 (MIT), jspdf-autotable 3.8.2 (MIT)
+
+**v1.1.0**
+- Days per site: 2, 3 or 4 – activities are re-planned per day and the tracker follows
+- Outage rules: approved outage start + max allowed hours; power-off never starts before the approved start,
+  the outage closes when "Cells on air" is done and every site type is flagged if it runs past the allowed window
+- Basebands: any number of basebands, each New or Reused with technology and quantity
+- Dashboard inputs (outage start, allowed hours, arrival, days, teams) can be changed directly in the Excel file
