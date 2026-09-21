@@ -1,0 +1,255 @@
+{
+  "domain": "TRM",
+  "project": {
+    "name": "MW Link Modernization",
+    "country": "Libya",
+    "prefix": "LNK",
+    "arrive": "09:00",
+    "maxHours": 10,
+    "daysPerSite": 4,
+    "outStart": "11:30",
+    "outMax": 6.5,
+    "startDate": "2026-10-05",
+    "teams": 2,
+    "sectors": 3,
+    "legacyRRU": 0,
+    "weekend": "frisat",
+    "regions": ""
+  },
+  "equipment": [
+    {
+      "model": "Antenna 0.6m HPX",
+      "kind": "radio",
+      "min": 45
+    },
+    {
+      "model": "Antenna 0.9m HPX",
+      "kind": "radio",
+      "min": 60
+    },
+    {
+      "model": "Antenna 1.2m HPX",
+      "kind": "radio",
+      "min": 75
+    },
+    {
+      "model": "Antenna 1.8m HPX",
+      "kind": "radio",
+      "min": 120
+    },
+    {
+      "model": "RAU 6363",
+      "kind": "radio",
+      "min": 15
+    },
+    {
+      "model": "RAU 6365",
+      "kind": "radio",
+      "min": 15
+    },
+    {
+      "model": "ML 6352",
+      "kind": "radio",
+      "min": 30
+    },
+    {
+      "model": "ML 6691 IDU",
+      "kind": "radio",
+      "min": 30
+    },
+    {
+      "model": "ML 6692 IDU",
+      "kind": "radio",
+      "min": 30
+    },
+    {
+      "model": "MMU 3",
+      "kind": "radio",
+      "min": 15
+    }
+  ],
+  "unit": {
+    "cableRadio": 30,
+    "cableAIR": 0,
+    "dismantleRRU": 0,
+    "jumperSector": 0
+  },
+  "fixed": {
+    "access": 15,
+    "ehs": 15,
+    "material": 30,
+    "rfi": 30,
+    "precheck": 30,
+    "assemble": 60,
+    "prepIdu": 60,
+    "rigging": 30,
+    "pole": 60,
+    "iduInst": 30,
+    "brk": 45,
+    "nedcn": 30,
+    "swup": 60,
+    "ifc": 30,
+    "sbl": 30,
+    "lcfg": 30,
+    "lrf": 30,
+    "logout": 15,
+    "travel": 45,
+    "align": 120,
+    "alignSD": 60,
+    "confirm": 30,
+    "backup": 30,
+    "gng": 15,
+    "nocStart": 30,
+    "npu": 60,
+    "traffic": 90,
+    "relocate": 60,
+    "confirmUp": 30,
+    "backupAfter": 30,
+    "clearPm": 30,
+    "decomIdu": 90,
+    "dism": 90,
+    "nodeVis": 30,
+    "clearAlarms": 60,
+    "leave": 15,
+    "stability": 30,
+    "cleanup": 120,
+    "vss": 60,
+    "vssSnag": 60,
+    "pack": 60,
+    "qaPrep": 90,
+    "license": 60,
+    "qaSnag": 60,
+    "route": 30,
+    "contin": 30,
+    "ready": 15,
+    "discDish": 45,
+    "alignHot": 90,
+    "trafficHot": 30,
+    "connRad": 30,
+    "relChk": 30,
+    "cfg": 30,
+    "txOn": 30,
+    "xpi": 60,
+    "rearrange": 30,
+    "resetCfg": 30,
+    "finetune": 60,
+    "powerRad": 30,
+    "login": 30,
+    "labels": 30,
+    "relocIdu": 30,
+    "cfgMmu": 30
+  },
+  "types": [
+    {
+      "name": "SC-1 Antenna swap + RAU",
+      "sites": 6,
+      "method": "normal",
+      "compact": false,
+      "sd": false,
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Antenna",
+          "model": "Antenna 0.9m HPX",
+          "qty": 1,
+          "min": 60
+        },
+        {
+          "role": "Radio",
+          "model": "RAU 6363",
+          "qty": 2,
+          "min": 15
+        }
+      ]
+    },
+    {
+      "name": "SC-1 Hot swap",
+      "sites": 4,
+      "method": "hot",
+      "compact": false,
+      "sd": false,
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Antenna",
+          "model": "Antenna 0.9m HPX",
+          "qty": 1,
+          "min": 60
+        },
+        {
+          "role": "Radio",
+          "model": "RAU 6363",
+          "qty": 2,
+          "min": 15
+        }
+      ]
+    },
+    {
+      "name": "SC-2 1+0 to 2+0",
+      "sites": 5,
+      "method": "upg",
+      "compact": false,
+      "sd": false,
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Radio",
+          "model": "ML 6352",
+          "qty": 1,
+          "min": 30
+        }
+      ]
+    },
+    {
+      "name": "SC-5 1.2m + SD + IDU",
+      "sites": 3,
+      "method": "normal",
+      "compact": false,
+      "sd": true,
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Antenna main",
+          "model": "Antenna 1.2m HPX",
+          "qty": 1,
+          "min": 75
+        },
+        {
+          "role": "Antenna SD",
+          "model": "Antenna 1.2m HPX",
+          "qty": 1,
+          "min": 75
+        },
+        {
+          "role": "Radio",
+          "model": "RAU 6365",
+          "qty": 2,
+          "min": 15
+        },
+        {
+          "role": "IDU",
+          "model": "ML 6691 IDU",
+          "qty": 1,
+          "min": 30
+        }
+      ]
+    },
+    {
+      "name": "SC-8 IDU / NPU swap",
+      "sites": 4,
+      "method": "idu",
+      "compact": false,
+      "sd": false,
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "IDU",
+          "model": "ML 6691 IDU",
+          "qty": 1,
+          "min": 30
+        }
+      ]
+    }
+  ],
+  "siteList": ""
+}

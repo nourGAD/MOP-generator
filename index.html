@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>MOP Generator – Site Installation</title>
+<title>MOP Generator – RAN & TRM</title>
 <meta name="description" content="Generate time-phased site installation MOPs (Excel) from site types and equipment.">
 <meta name="theme-color" content="#172230">
 <link rel="manifest" href="manifest.webmanifest">
@@ -14,8 +14,20 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<div class="start" id="start" hidden>
+  <div class="startbox">
+    <h1>MOP Generator</h1>
+    <p>What are you planning?</p>
+    <div class="choices">
+      <button class="choice" data-mode="RAN"><b>RAN</b><span>Site installation – radios, 5G AIR, basebands, RBS, cutover</span></button>
+      <button class="choice" data-mode="TRM"><b>TRM</b><span>MW link installation – antennas, RAU / ML 6352, ML 66xx IDU, alignment, migration</span></button>
+    </div>
+    <p class="hint">You can switch any time from the top bar. Each part keeps its own setup.</p>
+  </div>
+</div>
 <header class="bar">
-  <div class="mast"><small>MOP generator · site installation</small>
+  <div class="seg" role="tablist" aria-label="Domain"><button role="tab" data-mode="RAN">RAN</button><button role="tab" data-mode="TRM">TRM</button></div>
+  <div class="mast"><small id="mastSub">MOP generator · site installation</small>
     <div class="titles"><input class="pname" id="pname" aria-label="Project name"><input class="pname cty" data-p="country" list="countries" aria-label="Country" placeholder="Country"></div></div>
   <datalist id="countries"><option>Lebanon</option><option>Egypt</option><option>Saudi Arabia</option><option>United Arab Emirates</option><option>Jordan</option><option>Oman</option><option>Qatar</option><option>Kuwait</option><option>Bahrain</option><option>Iraq</option><option>Palestine</option><option>Türkiye</option><option>South Africa</option><option>Angola</option><option>Zambia</option><option>Kenya</option><option>Nigeria</option><option>Morocco</option><option>Djibouti</option></datalist>
   <button class="ghost" id="exp" title="Save all inputs as a file to share with the team">Save setup</button>
@@ -29,18 +41,18 @@
   <details class="sec" open><summary>Project &amp; country</summary><div class="body">
     <div class="grid2">
       <label class="f">Country<input type="text" data-p="country" list="countries"></label>
-      <label class="f">Site ID prefix<input type="text" data-p="prefix" maxlength="8"></label>
+      <label class="f"><span class="lbl-id">Site ID prefix</span><input type="text" data-p="prefix" maxlength="8"></label>
       <label class="f">Weekend<select data-p="weekend"><option value="sun">Sunday</option><option value="frisat">Friday + Saturday</option><option value="satsun">Saturday + Sunday</option><option value="fri">Friday only</option></select></label>
       <label class="f">Regions (comma separated)<input type="text" data-p="regions" placeholder="e.g. North, South"></label>
     </div>
   </div></details>
-  <details class="sec" open><summary>New RBS / cabinet</summary><div class="body">
+  <details class="sec ran-only" open><summary>New RBS / cabinet</summary><div class="body">
     <p class="hint">New RBS or cabinet installed on Day 1 with the baseband (before it). Type is free text.</p>
     <div class="uh rbh"><span>RBS type</span><span>Qty</span><span>Min/unit</span><span></span></div>
     <div id="rbsList"></div>
     <button class="add" id="addRBS">Add RBS</button>
   </div></details>
-  <details class="sec" open><summary>Basebands</summary><div class="body">
+  <details class="sec ran-only" open><summary>Basebands</summary><div class="body">
     <p class="hint">Add every baseband on site. <b>New</b> ones are installed on Day 1; <b>Reused</b> ones are re-homed to the new radios during the outage.</p>
     <div id="bbs"></div>
     <button class="add" id="addBB">Add baseband</button>
@@ -48,7 +60,7 @@
   <details class="sec" open><summary>Schedule &amp; outage</summary><div class="body">
     <p class="hint">Set the approved outage start – the team arrives just in time for it on the cutover day. The outage closes when “Cells on air” is done and is flagged if it runs past the allowed hours.</p>
     <div class="grid2">
-      <label class="f">Days per site<select data-p="daysPerSite" data-num="1"><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option></select></label>
+      <label class="f ran-only">Days per site<select data-p="daysPerSite" data-num="1"><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option></select></label>
       <label class="f">Team on site (normal days)<input type="time" data-p="arrive"></label>
       <div class="f auto" id="cutLbl">Team on site – cutover day<output id="cutOut">–</output><small>auto: 1 h before outage</small></div>
       <label class="f">Approved outage start<input type="time" data-p="outStart"></label>
@@ -56,16 +68,17 @@
       <label class="f">Max hours per day<input type="number" min="4" max="16" step="0.5" data-p="maxHours"></label>
       <label class="f">Teams in parallel<input type="number" min="1" max="30" data-p="teams"></label>
       <label class="f">Project start<input type="date" data-p="startDate"></label>
-      <label class="f">Sectors per site<input type="number" min="1" max="6" data-p="sectors"></label>
-      <label class="f">Old RRUs to remove<input type="number" min="0" max="30" data-p="legacyRRU"></label>
+      <label class="f ran-only">Sectors per site<input type="number" min="1" max="6" data-p="sectors"></label>
+      <label class="f ran-only">Old RRUs to remove<input type="number" min="0" max="30" data-p="legacyRRU"></label>
     </div>
   </div></details>
-  <details class="sec" open><summary>Site types &amp; equipment</summary><div class="body">
-    <p class="hint">One card per equipment set. Add any part (low / mid band radio, extra RRU, 5G AIR) and write its band freely – install and cabling time follow quantity × minutes. Parts named AIR / 5G / NR are handled with the 5G AIR steps.</p>
-    <datalist id="roles"><option value="Low band"><option value="Mid band"><option value="High band"><option value="5G AIR"><option value="Extra RRU"></datalist>
+  <details class="sec" open><summary id="typesTitle">Site types &amp; equipment</summary><div class="body">
+    <p class="hint trm-only">One card per link type. Pick the swap method (sets the days), then add the parts per link end: antennas (size), radios (RAU / ML 6352) and ML 66xx IDU. Parts named Antenna / dish go to the antenna step, IDU / ML 66xx / NPU / MMU to the indoor step, the rest to the radio step.</p>
+    <p class="hint ran-only">One card per equipment set. Add any part (low / mid band radio, extra RRU, 5G AIR) and write its band freely – install and cabling time follow quantity × minutes. Parts named AIR / 5G / NR are handled with the 5G AIR steps.</p>
+    <datalist id="roles"></datalist>
     <datalist id="models"></datalist>
     <div id="types"></div>
-    <button class="add" id="addType">Add site type</button>
+    <button class="add" id="addType">Add type</button>
   </div></details>
   <details class="sec"><summary>Install time per unit</summary><div class="body">
     <p class="hint">Minutes to install one unit (bracket, hoist, fix, ground).</p>
@@ -73,16 +86,17 @@
     <button class="add" id="addEq">Add equipment model</button>
     <div style="height:14px"></div>
     <div class="fx"><span>Cabling per radio (min)</span><input type="number" min="0" data-u="cableRadio"></div>
-    <div class="fx"><span>Cabling per AIR (min)</span><input type="number" min="0" data-u="cableAIR"></div>
-    <div class="fx"><span>Dismantle per old RRU (min)</span><input type="number" min="0" data-u="dismantleRRU"></div>
-    <div class="fx"><span>Jumper swap per sector (min)</span><input type="number" min="0" data-u="jumperSector"></div>
+    <div class="fx ran-only"><span>Cabling per AIR (min)</span><input type="number" min="0" data-u="cableAIR"></div>
+    <div class="fx ran-only"><span>Dismantle per old RRU (min)</span><input type="number" min="0" data-u="dismantleRRU"></div>
+    <div class="fx ran-only"><span>Jumper swap per sector (min)</span><input type="number" min="0" data-u="jumperSector"></div>
   </div></details>
   <details class="sec"><summary>Activity durations</summary><div class="body">
     <p class="hint">Fixed minutes for every other step.</p>
     <div id="fixed"></div>
   </div></details>
-  <details class="sec"><summary>Site list (optional)</summary><div class="body">
-    <p class="hint">One site per line: <code>Site ID, Site type, Governorate</code>. Leave empty to auto-number sites from the counts above.</p>
+  <details class="sec"><summary id="listTitle">Site list (optional)</summary><div class="body">
+    <p class="hint ran-only">One site per line: <code>Site ID, Site type, Region</code>. Leave empty to auto-number sites from the counts above.</p>
+    <p class="hint trm-only">One link per line: <code>Link ID, Site A, Site B, Link type, Region</code>. Leave empty to auto-number links from the counts above.</p>
     <textarea id="sites" placeholder="LB-001, Type-1, Beirut&#10;LB-002, Type-2, Mount Lebanon"></textarea>
   </div></details>
 </aside>

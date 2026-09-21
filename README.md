@@ -1,4 +1,4 @@
-# MOP Generator – Site Installation
+# MOP Generator – RAN & TRM Installation
 
 A small web app that builds a time-phased installation MOP (Excel) from site types and equipment.
 Enter the country, site types (radios / AIR / baseband), unit install times and schedule rules; the app shows the
@@ -56,6 +56,15 @@ Dockerfile, nginx.conf, docker-compose.yml
 - Excel charts are not generated (library limitation); the app shows the timeline instead.
 
 ## Changelog
+
+**v2.0.0 – RAN + TRM**
+- Start screen and top-bar switch: **RAN** (site installation) or **TRM** (MW link installation). Each part keeps its own setup
+- TRM link types with swap method (sets the days): Normal swap 1 team (4 days, or 3 with both ends on Day 1),
+  Hot swap 2 teams (3 days), 1+0 → 2+0 upgrade (3 days), IDU / NPU swap only (2 days); space diversity option
+- TRM parts per link end: antennas (size), radios (RAU / ML 6352), ML 66xx IDU / MMU – auto-placed in the antenna, radio or indoor step
+- Outage day: team arrives just in time for the approved outage start; migration, rollback note, decommissioning, QA / VSS / VCOP
+- TRM Excel & PDF: link tracker with Site A / Site B, connections per link end, link-days and finish date
+- Templates built from the Libya (Almadar) and Madagascar TRM MOPs
 
 **v1.3.0**
 - New RBS / cabinet list (free-text type, qty, minutes) – installed on Day 1 before the baseband
