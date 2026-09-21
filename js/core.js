@@ -15,6 +15,15 @@
     ["closeSite", "Close site", 15],
   ];
 
+  const RAN_EXTRA_LIST = [
+    ["ehsRsc", "EHS inspection with RSC", 45], ["rfi", "RFI verification & pre-installation check", 30], ["preAsm", "Pre-assembly & cable prep on ground", 60],
+    ["connPrep", "Prepare DC / fiber connectors", 30], ["enclosure", "Install enclosure (new site)", 30], ["encPower", "Power up enclosure", 30],
+    ["bbComm", "BB commissioning (run script)", 30], ["preInteg", "Pre-integration (remote)", 60], ["connect", "Connect new units to BB (expansion)", 30],
+    ["integExp", "Integration – expansion (remote)", 20], ["alarmChk", "Alarm check (site diagnostics)", 30], ["srs", "SRS testing (sectors / technologies)", 60],
+    ["phys", "Physical parameters – azimuth & MT", 60], ["sealing", "Outdoor sealing & labelling", 60], ["indoorSys", "Indoor systemization & labelling", 90],
+    ["qaUpload", "QA photos upload (Eritop / ECO)", 120], ["rscReview", "RSC review", 60], ["docs", "Acceptance documentation", 60], ["eod", "End-of-day report to IM", 10],
+  ];
+  const D0_DEFAULT_TXT = "SID with site-specific connection diagram, MR for the site, RFI confirmation, site access\nMaterial collection booked (48 h before); discrepancies vs SID / MR reported to IM\nBB serial shared for script generation; scripts uploaded (ESI / ZTI) and checked by TL\nSRS data loaded on SRS server\nWhatsApp / Teams group with all stakeholders\nApproved CR available at least 1 day before";
   const DEFAULT_STATE = () => ({
     domain: "RAN",
     project: { name: "Swap & Modernization", country: "Lebanon", prefix: "LB", arrive: "07:00", maxHours: 11,
@@ -32,7 +41,8 @@
       { model: "AIR 3255 B78AA", kind: "air", min: 40 },
     ],
     unit: { cableRadio: 15, cableAIR: 20, dismantleRRU: 20, jumperSector: 30 },
-    fixed: Object.fromEntries(FIXED.map(f => [f[0], f[2]])),
+    fixed: Object.fromEntries(FIXED.concat(RAN_EXTRA_LIST).map(f => [f[0], f[2]])),
+    d0: D0_DEFAULT_TXT,
     types: [
       { name: "Type-1", sites: 5, reuseCabling: false, units: [
         { role: "Low band", model: "Radio 4486 B8B20B28", qty: 3, min: 20 },
@@ -69,7 +79,8 @@
       s.project = Object.assign({}, DEFAULT_TRM().project, x.project || {});
       s.fixed = Object.assign({}, DEFAULT_TRM().fixed, x.fixed || {}); s.unit = Object.assign({}, DEFAULT_TRM().unit, x.unit || {});
       if (!Array.isArray(s.types) || !s.types.length) s.types = DEFAULT_TRM().types;
-      s.types.forEach(t => { if (!TRM_METHODS[t.method]) t.method = "normal"; if (!Array.isArray(t.units)) t.units = []; });
+      s.types.forEach(t => { if (!TRM_METHODS[t.method]) t.method = "normal"; if (!Array.isArray(t.units)) t.units = []; if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, add: [] }; });
+      if (typeof s.d0 !== "string") s.d0 = DEFAULT_TRM().d0;
       return s;
     }
     const d = DEFAULT_STATE(); const s = Object.assign(d, x || {}); s.domain = "RAN";
@@ -81,7 +92,7 @@
       if (op.newBB !== undefined) { if (op.newBB) b.push({ model: op.newBB, status: "New", tech: "4G+5G", qty: 1 }); if (op.oldBB) b.push({ model: op.oldBB, status: "Reused", tech: "3G", qty: 1 }); }
       s.basebands = b.length ? b : d.basebands;
     }
-    s.fixed = Object.assign({}, d.fixed, (x && x.fixed) || {});
+    s.fixed = Object.assign({}, d.fixed, (x && x.fixed) || {}); if (typeof s.d0 !== "string") s.d0 = d.d0;
     s.unit = Object.assign({}, d.unit, (x && x.unit) || {});
     if (!Array.isArray(s.types) || !s.types.length) s.types = d.types;
     const libMin = m => { const e = (s.equipment || []).find(q => q.model === m); return e ? +e.min : 20; };
@@ -94,6 +105,8 @@
       return { name: t.name, sites: t.sites, reuseCabling: !!t.reuseCabling, units: u };
     });
     if (!Array.isArray(s.rbs)) s.rbs = [];
+    s.types.forEach(t => { if (!RAN_SCEN[t.scenario]) t.scenario = "swap"; if (!RAN_SCEN[t.scenario].days.includes(+t.days)) t.days = t.scenario === "swap" && [2, 3, 4].includes(+s.project.daysPerSite) ? +s.project.daysPerSite : RAN_SCEN[t.scenario].def;
+      if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, add: [] }; });
     return s;
   }
 
@@ -137,8 +150,8 @@
   const clock = min => { min = Math.round(min); return `${String(Math.floor(min / 60) % 24).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`; };
   function equipMin(state, model) { const e = state.equipment.find(x => x.model === model); return e ? +e.min : 0; }
 
-  function activities(state, t) {
-    const F = state.fixed, U = state.unit, P = state.project, D = daysOf(P), CUT = cutDayOf(P);
+  function activities(state, t, Dsel) {
+    const F = state.fixed, U = state.unit, P = state.project, D = Dsel || daysOf(P), CUT = D === 4 ? 3 : 2;
     const RAD = radiosOf(t), AIRS = airsOf(t);
     const nr = sumQ(RAD), na = sumQ(AIRS);
     const radTxt = listTxt(RAD, true) || "radios";
@@ -193,6 +206,7 @@
       d.push(A("powAir", "Power up AIRs", `Connect AIR DC & fiber at ${NEW}, power up, no HW alarms`, "Ground tech", F.powerAir, ["airCab"]));
       d.push(A("nrInt", "5G pre-integration", "Load NR config on AIRs (cells locked)", "Remote integrator", F.nrInteg, ["powAir"], "", "🛰 Remote – parallel with field work"));
       d.push(A("close", "Close day", "Secure cables, photos, inform NOC", "All", F.closeDay, ["nrInt"]));
+      d.forEach(a => { if (["airs", "airCab", "powAir", "nrInt"].includes(a.key)) { a.group = "air"; a.allow = [1, 2]; } });
       days.push({ title: "📡 DAY 2 – 5G AIR INSTALLATION (no impact)", acts: d });
     }
     // ---- Cutover day
@@ -236,13 +250,205 @@
     days.push({ title: `⚡ DAY ${CUT} – CUTOVER + 5G (remote, parallel) + DISMANTLE${finishHere ? " + QA / RSC" : ""}`, acts: c, cut: true });
     if (!finishHere) {
       const f = startN(""); finishing(f, "safety");
+      f.forEach(a => { if (["dress", "kpi", "pack", "rsc", "snags"].includes(a.key)) { a.group = "fin"; a.allow = [CUT, D]; } });
       days.push({ title: `✅ DAY ${D} – FINISHING, QA, RSC & SNAG CLEARANCE`, acts: f });
     }
-    days.forEach((d, i) => { d.arrive = d.cut ? cutArrive(state) : hm(P.arrive); d.idx = i + 1;
+    return days;
+  }
+  // ======================= RAN MOP types =======================
+  const RAN_SCEN = {
+    swap: { label: "Swap / modernization (outage + dismantle)", days: [2, 3, 4], def: 2 },
+    exp: { label: "Expansion – add radio / BB (short outage)", days: [1, 2], def: 1 },
+    g5: { label: "5G AIR add only (no outage)", days: [1, 2], def: 1 },
+    nsb: { label: "New site build (no outage)", days: [2, 3], def: 3 },
+  };
+  const RAN_EXTRA_UNUSED = [
+    ["ehsRsc", "EHS inspection with RSC", 45], ["rfi", "RFI verification & pre-installation check", 30], ["preAsm", "Pre-assembly & cable prep on ground", 60],
+    ["connPrep", "Prepare DC / fiber connectors", 30], ["enclosure", "Install enclosure (new site)", 30], ["encPower", "Power up enclosure", 30],
+    ["bbComm", "BB commissioning (run script)", 30], ["preInteg", "Pre-integration (remote)", 60], ["connect", "Connect new units to BB (expansion)", 30],
+    ["integExp", "Integration – expansion (remote)", 20], ["alarmChk", "Alarm check (site diagnostics)", 30], ["srs", "SRS testing (sectors / technologies)", 60],
+    ["phys", "Physical parameters – azimuth & MT", 60], ["sealing", "Outdoor sealing & labelling", 60], ["indoorSys", "Indoor systemization & labelling", 90],
+    ["qaUpload", "QA photos upload (Eritop / ECO)", 120], ["rscReview", "RSC review", 60], ["docs", "Acceptance documentation", 60], ["eod", "End-of-day report to IM", 10],
+  ];
+  const D0_DEFAULT = "SID with site-specific connection diagram, MR for the site, RFI confirmation, site access\nMaterial collection booked (48 h before); discrepancies vs SID / MR reported to IM\nBB serial shared for script generation; scripts uploaded (ESI / ZTI) and checked by TL\nSRS data loaded on SRS server\nWhatsApp / Teams group with all stakeholders\nApproved CR available at least 1 day before";
+  const TRM_D0 = "Correct LB design available; laptop ready (min 4 GB RAM)\nApproved CR available at least 1 day before site activities\nNo move to site without customer RFI confirmation and SID / TSSR / LB\nOutage plan shared with expected migration date";
+
+  function ranBuild(state, t) {
+    const sc = RAN_SCEN[t.scenario] ? t.scenario : "swap", S = RAN_SCEN[sc];
+    const D = S.days.includes(+t.days) ? +t.days : S.def;
+    if (sc === "swap") return activities(state, t, D);
+    const F = state.fixed, U = state.unit;
+    const RAD = radiosOf(t), AIRS = airsOf(t), nr = sumQ(RAD), na = sumQ(AIRS), reuse = !!t.reuseCabling;
+    const newN = bbQty(state, "New"), NEW = bbNames(state, "New") || "new baseband";
+    const RBS = (state.rbs || []).filter(r => r.type && +r.qty > 0);
+    const A = (key, name, desc, who, dur, after, impact, rem, extra) => Object.assign({ key, name, desc, who, dur: Math.max(0, Math.round(+dur || 0)), after: after || [], impact: impact || "Non-SA", rem: rem || "" }, extra || {});
+    const TW = "Tower crew", GT = "Ground tech", RI = "Remote integrator";
+    const start = (first) => [
+      A("access", "Site access & alarm pre-check", "Share site ID, request access and pre-checks with NOC; alarm log before starting", "Team lead", F.accessN || 15),
+      A("safety", "EHS preparation", "Site file, EHS gear, barricade, PPE", "All", F.safetyN || 15, ["access"]),
+      A("ehs", "EHS inspection with RSC", "EHS audit with RSC – no site activity before EHS is complete", "All + RSC", F.ehsRsc, ["safety"]),
+      ...(first ? [A("rfi", "RFI verification & pre-check", "Check RFI per SID (CB, poles, tray, earth bars); report visible site issues to IM", "Team lead", F.rfi, ["ehs"]),
+        A("material", "Material delivery & verification", "Unpack vs MR, sign POD, report missing items", "Team lead", F.material, ["ehs"])] : []),
+    ];
+    const endDay = (L, after, siteClose) => {
+      L.push(A("eod", "End-of-day report", "Review completed scope and report to IM", "Team lead", F.eod, after));
+      L.push(A(siteClose ? "closeS" : "close", siteClose ? "Close site" : "Close day", "Post health check with integrator, clean site, pack up, inform NOC" + (siteClose ? " 🎉" : ""), "All", siteClose ? F.closeSite : F.closeDay, ["eod"]));
+    };
+    const bbTrack = (L, after) => {
+      let last = after;
+      RBS.forEach((r, i) => { L.push(A("rbs" + i, `Install ${r.type}`, `Install ${r.qty}x ${r.type}; grounding, DC feed`, GT, (+r.qty || 0) * (+r.min || 0), [last], "", "New RBS / cabinet")); last = "rbs" + i; });
+      if (sc === "nsb" && !RBS.length) { L.push(A("enc", "Install enclosure", "Assemble & install new enclosure, connect grounding", "Team lead + " + GT, F.enclosure, [last])); last = "enc";
+        L.push(A("encP", "Power up enclosure", "DC power cable DCDU ↔ enclosure, power up", "Team lead + " + GT, F.encPower, [last])); last = "encP"; }
+      if (newN) { L.push(A("bbInst", `Install ${NEW} & TRM check`, "Assemble, label, install & ground new BB; power up; connect assigned TRM port and check it is up", "Team lead + " + GT, F.bbInstall * newN, [last]));
+        L.push(A("bbComm", "BB commissioning", "Run script on BB (if not pre-staged)", "Team lead + " + RI, F.bbComm, ["bbInst"]));
+        L.push(A("preInt", "Pre-integration", "Start pre-integration on new BB", RI, F.preInteg, ["bbComm"], "", "🛰 Remote – parallel")); last = "preInt"; }
+      return last;
+    };
+    const tower = (L, after, withRadios, withAirs) => {
+      L.push(A("pre", "Pre-assembly & cable prep", "Assemble units on ground, sector labels; lay out power cable; label fiber (no kinks)", "Tower crew + " + GT, F.preAsm, [after]));
+      L.push(A("conn", "Prepare DC / fiber connectors", "Prepare DC power connectors (TL checks)", GT, F.connPrep, ["pre"]));
+      L.push(A("rig", "Rigging", "Tower climbing, rope lifting, lifting rig & rescue kit", TW, F.riggingN || 15, ["pre"]));
+      let last = "rig";
+      if (withRadios && nr) { L.push(A("radios", "Install radios", `Install ${listTxt(RAD, true)}; ground, jumpers, RET`, TW, sumMin(RAD), [last])); last = "radios"; }
+      if (withAirs && na) { L.push(A("airs", "Install 5G AIRs", `Install ${listTxt(AIRS, true)}; azimuth / tilt per RND`, TW, sumMin(AIRS), [last])); last = "airs"; }
+      L.push(A("cab", "Cables installation", "Fiber & power from units to cabinet inlet; connect fiber on BB and power on CB", TW, reuse ? 0 : nr * U.cableRadio + na * U.cableAIR, [last, "conn"], "", reuse ? "SKIPPED – existing cabling reused" : ""));
+      return "cab";
+    };
+    const qa = (L, after, siteClose, allow) => {
+      const g = (a) => Object.assign(a, allow ? { group: "qa", allow } : {});
+      L.push(g(A("seal", "Outdoor sealing & labelling", "Weatherproof power cables, label all cables", TW, F.sealing, [after])));
+      L.push(g(A("indoor", "Indoor systemization & labelling", "Ladder & indoor systemization, labels", GT, F.indoorSys, [after])));
+      if (D === 1) L.push(g(A("qaUp", "QA photos & RSC submission", "Take QA photos, upload (Eritop / ECO) and submit to RSC", "All", F.rsc, ["seal", "indoor"])));
+      else { L.push(g(A("qaUp", "QA photos upload", "Take QA photos and upload (Eritop / ECO)", "All", F.qaUpload, ["seal", "indoor"])));
+        L.push(g(A("rscR", "RSC review", "RSC reviews and shares feedback", "RSC", F.rscReview, ["qaUp"]))); }
+      L.push(g(A("snags", "Snag rectification", "Clear snags raised by RSC and re-submit", "All", F.snags, [D === 1 ? "qaUp" : "rscR"], "", "Buffer – skip if RSC clean")));
+      endDay(L, ["snags"], siteClose);
+    };
+    const days = [];
+    if (sc === "g5") {
+      const d1 = start(true); let last = bbTrack(d1, "material");
+      const tw = tower(d1, "material", false, true);
+      d1.push(A("int", "5G integration", "Integrator proceeds with 5G integration", RI, F.nrInteg, [tw, last], "", "🛰 Remote"));
+      d1.push(A("phys", "Physical parameters", "Set azimuth & mechanical tilt", "Tower crew + " + GT, F.phys, [tw]));
+      d1.push(A("alarm", "Alarm check", "Site diagnostics: alarms & status", RI, F.alarmChk, ["int"]));
+      d1.push(A("srs", "SRS testing", "SRS test – sectors & technologies working", "Team lead", F.srs, ["alarm"]));
+      if (D === 1) { qa(d1, tw, true); days.push({ title: "📡 DAY 1 – 5G AIR INSTALLATION, INTEGRATION & QA (no outage)", acts: d1 }); }
+      else { endDay(d1, ["srs", "phys"], false); days.push({ title: "📡 DAY 1 – 5G AIR INSTALLATION & INTEGRATION (no outage)", acts: d1 });
+        const d2 = start(false); qa(d2, "ehs", true, [1, 2]); days.push({ title: "✅ DAY 2 – SEALING, SYSTEMIZATION & QA", acts: d2 }); }
+    } else if (sc === "exp") {
+      const d1 = start(true); const bb = bbTrack(d1, "material"); const tw = tower(d1, "material", true, true);
+      const outDay = D === 1 ? d1 : null;
+      const cut = (L, pre) => {
+        L.push(A("gng", "GO / NO-GO", "Pre-checks done, integrator & NOC online; approval to start outage", "Team lead + " + RI, F.gng, pre));
+        L.push(A("off", "Start outage – lock affected cells", "Lock affected cells (remote) before connecting new units", RI + " + FE", F.powerOff, ["gng"], "Outage", "🔴 OUTAGE STARTS – not before approved start", { atOutage: true }));
+        L.push(A("connect", "Connect new units / re-home", "Connect new radios / BB, TN changes as per SID", GT + " + FE", F.connect, ["off"], "Outage"));
+        L.push(A("integ", "Integration", "Activate new units and unlock cells", RI, F.integExp, ["connect"], "Outage", "Remote"));
+        L.push(A("onair", "Cells on air", "NOC confirms all cells on air", "NOC + " + RI, F.onair, ["integ"], "Outage", "🟢 OUTAGE ENDS – rollback if not OK"));
+        L.push(A("alarm", "Alarm check", "Site diagnostics: alarms & status", RI, F.alarmChk, ["onair"]));
+        L.push(A("srs", "SRS testing", "SRS test – sectors & technologies working", "Team lead", F.srs, ["alarm"]));
+        L.push(A("phys", "Physical parameters", "Set azimuth & mechanical tilt", "Tower crew + " + GT, F.phys, ["onair"]));
+      };
+      if (D === 1) { cut(d1, [tw, bb]); qa(d1, "onair", true); days.push({ title: "🔧 DAY 1 – EXPANSION: INSTALL, SHORT OUTAGE & QA", acts: d1, cut: true }); }
+      else { endDay(d1, [tw, bb], false); days.push({ title: "🔧 DAY 1 – EXPANSION INSTALLATION (no impact)", acts: d1 });
+        const d2 = start(false); cut(d2, ["ehs"]); qa(d2, "phys", true); days.push({ title: "⚡ DAY 2 – CONNECT (short outage), TESTS & QA", acts: d2, cut: true }); }
+    } else {
+      const d1 = start(true); const bb = bbTrack(d1, "material"); const tw = tower(d1, "material", true, D === 2);
+      endDay(d1, [tw, bb], false); days.push({ title: "🏗 DAY 1 – NEW SITE: ENCLOSURE, BB & HARDWARE", acts: d1 });
+      const d2 = start(false);
+      if (D === 3 && na) { d2.push(A("rig2", "Rigging", "Tower climbing & rescue kit", TW, F.riggingN || 15, ["ehs"]));
+        d2.push(A("airs", "Install 5G AIRs", `Install ${listTxt(AIRS, true)}`, TW, sumMin(AIRS), ["rig2"])); }
+      d2.push(A("int", "Site integration", "Integrator integrates all technologies", RI, F.integ, ["ehs"], "", "🛰 Remote"));
+      d2.push(A("alarm", "Alarm check", "Site diagnostics: alarms & status", RI, F.alarmChk, ["int"]));
+      d2.push(A("srs", "SRS testing", "SRS test – sectors & technologies working", "Team lead", F.srs, ["alarm"]));
+      d2.push(A("phys", "Physical parameters", "Set azimuth & mechanical tilt", "Tower crew + " + GT, F.phys, [D === 3 && na ? "airs" : "ehs"]));
+      if (D === 2) { qa(d2, "phys", true); days.push({ title: "✅ DAY 2 – INTEGRATION, SRS & QA (no outage)", acts: d2 }); }
+      else { d2.push(A("seal", "Outdoor sealing & labelling", "Weatherproof power cables, label all cables", TW, F.sealing, ["phys"], "", "", { group: "sys", allow: [2, 3] }));
+        d2.push(A("indoor", "Indoor systemization & labelling", "Ladder & indoor systemization, labels", GT, F.indoorSys, ["ehs"], "", "", { group: "sys", allow: [2, 3] }));
+        endDay(d2, ["srs", "seal", "indoor"], false); days.push({ title: "📡 DAY 2 – INTEGRATION, SRS & SYSTEMIZATION (no outage)", acts: d2 });
+        const d3 = start(false);
+        d3.push(A("qaUp", "QA photos upload", "Take QA photos and upload (Eritop / ECO)", "All", F.qaUpload, ["ehs"]));
+        d3.push(A("rscR", "RSC review", "RSC reviews and shares feedback", "RSC", F.rscReview, ["qaUp"]));
+        d3.push(A("docs", "Acceptance documentation", "Prepare & submit quality / acceptance documents", "Team lead", F.docs, ["qaUp"]));
+        d3.push(A("snags", "Snag rectification", "Clear snags and close QA", "All", F.snags, ["rscR"], "", "Buffer – skip if RSC clean"));
+        endDay(d3, ["snags", "docs"], true); days.push({ title: "✅ DAY 3 – QA, RSC & ACCEPTANCE READINESS", acts: d3 }); }
+    }
+    return days;
+  }
+
+  // ---- user edits on steps: remove / move to another day / change minutes / add custom steps
+  function applyEdits(days, t) {
+    days.forEach((d, i) => { d.n = i + 1; d.acts.forEach(a => { a.id = `${i + 1}:${a.key}`; }); });
+    const E = t.edits || {}, rm = E.rm || {}, mv = E.mv || {}, du = E.dur || {};
+    const dropFrom = (d, a) => { const i = d.acts.indexOf(a); if (i < 0) return; d.acts.splice(i, 1);
+      d.acts.forEach(x => { if (x.after.includes(a.key)) x.after = [...new Set(x.after.filter(k => k !== a.key).concat(a.after))]; }); };
+    days.forEach(d => d.acts.slice().forEach(a => { if (rm[a.id]) { a.removed = true; dropFrom(d, a); } }));
+    days.forEach(d => d.acts.forEach(a => { if (du[a.id] !== undefined && du[a.id] !== "") a.dur = Math.max(0, Math.round(+du[a.id] || 0)); }));
+    const anchor = d => { const k = ["ehs", "safety", "cehs", "aehs", "qehs", "behs", "access", "cacc", "aacc"].find(x => d.acts.some(a => a.key === x)); return k ? [k] : []; };
+    const crew = w => /Tower|Rigger/.test(w || "") ? "T" : /^Remote/.test(w || "") ? "R" : /Ground/.test(w || "") ? "G" : "O";
+    // same crew works one step after the other: attach after that crew's last step of the day
+    const crewAnchor = (d, a) => { const body = d.acts.slice(0, -1).filter(x => x.key !== "eod" && x !== a);
+      const same = body.filter(x => crew(x.who) === crew(a.who) && crew(a.who) !== "O"); return same.length ? [same[same.length - 1].key] : anchor(d); };
+    const tailInto = (d, a) => { const last = d.acts[d.acts.length - 1]; if (last && last !== a && !last.after.includes(a.key)) last.after.push(a.key); };
+    const insertBeforeLast = (d, a) => { d.acts.splice(Math.max(0, d.acts.length - 1), 0, a); };
+    const batches = {};
+    Object.entries(mv).forEach(([id, to]) => {
+      const from = days.find(d => d.acts.some(a => a.id === id)); const target = days[(+to || 1) - 1];
+      if (!from || !target || from === target) return;
+      const k = from.n + ">" + target.n; (batches[k] = batches[k] || { from, target, acts: [] }).acts.push(from.acts.find(x => x.id === id));
+    });
+    Object.values(batches).forEach(({ from, target, acts }) => {
+      acts.sort((x, y) => from.acts.indexOf(x) - from.acts.indexOf(y));
+      const orig = acts.map(a => ({ a, key: a.key, after: a.after.slice() })), map = {};
+      orig.forEach(o => { map[o.key] = "m_" + o.a.id.replace(/\W/g, "_"); });
+      acts.forEach(a => dropFrom(from, a));
+      orig.forEach(o => { const a = o.a; a.key = map[o.key]; a.moved = true;
+        const inner = o.after.filter(k => map[k]).map(k => map[k]); a.after = inner.length ? inner : crewAnchor(target, a);
+        if (a.impact === "Outage" && !target.cut) a.impact = "Non-SA"; if (a.atOutage && !target.cut) a.atOutage = false;
+        insertBeforeLast(target, a); });
+      orig.forEach(o => tailInto(target, o.a));
+    });
+    (E.add || []).forEach((c, j) => {
+      const target = days[(+c.day || 1) - 1] || days[days.length - 1];
+      const after = c.after && target.acts.some(a => a.key === c.after) ? [c.after] : crewAnchor(target, { who: c.who || "All" });
+      const a = { key: "c_" + (c.id || j), id: "c:" + (c.id || j), name: c.name || "New step", desc: c.desc || "", who: c.who || "All", dur: Math.max(0, Math.round(+c.dur || 0)),
+        after, impact: c.outage && target.cut ? "Outage" : "Non-SA", rem: "Added step", custom: true, cid: c.id || j };
+      insertBeforeLast(target, a); tailInto(target, a);
+    });
+    return days;
+  }
+  function finalize(state, t, days) {
+    applyEdits(days, t);
+    days.forEach((d, i) => { d.idx = i + 1; d.title = d.title.replace(/DAY \d+/, `DAY ${i + 1}`);
       const pos = {}; d.acts.forEach((a, k) => pos[a.key] = k + 1);
       d.acts.forEach(a => { a.afterIdx = a.after.map(k => pos[k]).filter(Boolean); }); });
     return days;
   }
+  // steps the user removed (so they can be restored)
+  function removedSteps(state, t) {
+    const raw = state.domain === "TRM" ? trmActivities(state, t, true) : ranBuild(state, t);
+    const out = []; raw.forEach((d, i) => d.acts.forEach(a => { const id = `${i + 1}:${a.key}`; if ((t.edits && t.edits.rm || {})[id]) out.push({ id, name: a.name, day: i + 1 }); }));
+    return out;
+  }
+  // greedy balancing: move flexible steps to the day that keeps the longest day as short as possible
+  function autoBalance(state, t) {
+    const base = JSON.parse(JSON.stringify(t.edits || {})); base.mv = base.mv || {};
+    const tt = Object.assign({}, t, { edits: base });
+    const r0 = schedule(state, tt); if (r0.days.length < 2) return base;
+    const raw = state.domain === "TRM" ? trmActivities(state, t, true) : ranBuild(state, t);
+    const groups = [], gi = {};
+    raw.forEach((d, i) => d.acts.forEach(a => { if (!a.group || !a.allow) return; const id = `${i + 1}:${a.key}`;
+      if (!gi[a.group]) { gi[a.group] = { name: a.group, ids: [], orig: i + 1, allow: a.allow }; groups.push(gi[a.group]); } gi[a.group].ids.push(id); }));
+    if (!groups.length) return base;
+    const setG = (g, k) => g.ids.forEach(id => { if (k === g.orig) delete base.mv[id]; else base.mv[id] = k; });
+    const score = () => { const r = schedule(state, tt), h = r.days.map(d => d.hours); return Math.max(...h) * 1000 + (Math.max(...h) - Math.min(...h)); };
+    groups.forEach(g => {
+      let best = g.orig, bestS = Infinity;
+      g.allow.forEach(k => { if (k < 1 || k > r0.days.length) return; setG(g, k); const s = score(); if (s < bestS - 0.001) { bestS = s; best = k; } });
+      setG(g, best);
+    });
+    return base;
+  }
+
 
   // ======================= TRM (MW link) =======================
   const TRM_FIXED = [
@@ -270,6 +476,7 @@
     ["labels", "Check cable labels for relocation", 30], ["relocIdu", "Move cables from old IDU to new IDU", 30], ["cfgMmu", "Configure MMU / radio as before", 30],
   ];
   const TRM_METHODS = {
+    new: { label: "New link (no outage)", days: 4 },
     normal: { label: "Normal swap (1 team, cold)", days: 4 },
     hot: { label: "Hot swap (2 teams, both ends)", days: 3 },
     upg: { label: "1+0 → 2+0 upgrade (add radio)", days: 3 },
@@ -278,7 +485,7 @@
   const trmCat = u => /\b(ant|antenna|dish|hpx?|vhlp|sb\d)/i.test(`${u.role} ${u.model}`) ? "ant"
     : /\b(idu|npu|mmu|optix|odf)\b|ml ?66\d\d|669\d/i.test(`${u.role} ${u.model}`) ? "idu" : "rad";
   const DEFAULT_TRM = () => ({
-    domain: "TRM",
+    domain: "TRM", d0: "Correct LB design available; laptop ready (min 4 GB RAM)\nApproved CR available at least 1 day before site activities\nNo move to site without customer RFI confirmation and SID / TSSR / LB\nOutage plan shared with expected migration date",
     project: { name: "MW Link Modernization", country: "Libya", prefix: "LNK", arrive: "09:00", maxHours: 10, daysPerSite: 4, outStart: "11:30", outMax: 6.5,
       startDate: "2026-10-05", teams: 2, sectors: 3, legacyRRU: 0, weekend: "frisat", regions: "" },
     equipment: [
@@ -305,7 +512,7 @@
     siteList: "",
   });
 
-  function trmActivities(state, t) {
+  function trmActivities(state, t, raw) {
     const F = state.fixed, U = state.unit, m = TRM_METHODS[t.method] ? t.method : "normal";
     const all = unitsOf(t), ANT = all.filter(u => trmCat(u) === "ant"), RAD = all.filter(u => trmCat(u) === "rad"), IDU = all.filter(u => trmCat(u) === "idu");
     const antMin = sumMin(ANT), radMin = sumMin(RAD), iduN = sumQ(IDU), nRad = sumQ(RAD), hasAnt = ANT.length > 0, sd = !!t.sd;
@@ -355,7 +562,7 @@
       const leaveAfter = ["bka", "pm"];
       if (opts.dism) {
         if (iduN) { L.push(A("dIdu", "Uninstall old IDU / card", "Uninstall old IDU or card per decommissioning plan", FE, F.decomIdu, ["up"])); leaveAfter.push("dIdu"); }
-        L.push(A("dism", "Dismantle old link", "Dismantle old antenna, radio, MW pole and IF cables; lower to ground", RG, F.dism, ["up"])); leaveAfter.push("dism");
+        L.push(A("dism", "Dismantle old link", "Dismantle old antenna, radio, MW pole and IF cables; lower to ground", RG, F.dism, ["up"], "", "", { group: "dis", allow: [opts.day, opts.day + 1] })); leaveAfter.push("dism");
       }
       L.push(A("vis", "Node visibility & link health", "Check node visibility with integrator; confirm link healthy", INT, F.nodeVis, ["bka"]));
       L.push(A("alm", "Clear alarms & QA print screens", "Clear node alarms, take print screens for QA", FE, F.clearAlarms, ["vis"]));
@@ -381,7 +588,31 @@
       return L;
     };
     const days = [];
-    if (m === "normal") {
+    if (m === "new") {
+      if (t.compact) {
+        const L = endBlock("a", "Site A", true);
+        L.push(A("mv", "Move to Site B", "Logout Site A and move to far-end site", "All", F.travel, ["aout"]));
+        L.push(...endBlock("b", "Site B", false, "mv"));
+        days.push({ title: "🔧 DAY 1 – NEW LINK: SITE A + SITE B INSTALLATION", acts: L });
+      } else {
+        days.push({ title: "🔧 DAY 1 – NEW LINK: SITE A INSTALLATION", acts: endBlock("a", "Site A", true) });
+        days.push({ title: "🔧 DAY 2 – NEW LINK: SITE B INSTALLATION", acts: endBlock("b", "Site B", false) });
+      }
+      const c = start("c", true, false);
+      c.push(A("aln", "Link alignment", "Align link, include far-end visit; achieve RSL & XPI per LB", RG + " + FE", F.align, ["cehs"]));
+      let a2 = "aln";
+      if (sd) { c.push(A("sd", "Main-Div alignment (SD)", "Align main–diversity antenna; check interference", RG + " + FE", F.alignSD, ["aln"])); a2 = "sd"; }
+      c.push(A("cnf", "Confirm RSL / XPI", "Confirm desired RSL and XPI achieved", FE, F.confirm, [a2]));
+      c.push(A("int", "Link integration & DCN", "Configure DCN / VLANs, node visible on ENM, services per design (assigned TX ports only)", INT + " + FE", F.traffic, ["cnf"], "", "🛰 Remote – no outage: new link"));
+      c.push(A("vis", "Node visibility & link health", "Check node visibility with integrator; confirm link healthy", INT, F.nodeVis, ["int"]));
+      c.push(A("alm", "Clear alarms & QA print screens", "Clear node alarms, take print screens for QA", FE, F.clearAlarms, ["vis"]));
+      c.push(A("lrf", "Share LRF / RMM fingerprint", "Share license request file for processing", FE, F.lrf, ["cnf"]));
+      c.push(A("pm", "Clear PM logs", "Clear performance logs for 24h approval", FE, F.clearPm, ["alm"]));
+      c.push(A("lv", "Confirm with NOC & leave", "Confirm status with NOC; leave site", "All", F.leave, ["pm", "lrf"]));
+      days.push({ title: `📡 DAY ${days.length + 1} – ALIGNMENT & INTEGRATION (no outage)`, acts: c });
+      const q = qaDay(false); q.forEach(a => { if (!["qacc", "qehs", "qlo"].includes(a.key)) { a.group = "qa"; a.allow = [days.length, days.length + 1]; } });
+      days.push({ title: `✅ DAY ${days.length + 1} – QA, VSS / VCOP SESSIONS`, acts: q });
+    } else if (m === "normal") {
       if (t.compact) {
         const L = endBlock("a", "Site A", true);
         L.push(A("mv", "Move to Site B", "Logout Site A and move to far-end site", "All", F.travel, ["aout"]));
@@ -396,7 +627,7 @@
       let a2 = "aln";
       if (sd) { c.push(A("sd", "Main-Div alignment (SD)", "Align main–diversity antenna; check interference", RG + " + FE", F.alignSD, ["aln"])); a2 = "sd"; }
       c.push(A("cnf", "Confirm RSL / XPI", "Confirm desired RSL and XPI achieved", FE, F.confirm, [a2]));
-      migration(c, a2, { npu: iduN > 0, dism: true });
+      migration(c, a2, { npu: iduN > 0, dism: true, day: days.length + 1 });
       days.push({ title: `⚡ DAY ${days.length + 1} – ALIGNMENT, MIGRATION & DECOMMISSIONING`, acts: c, cut: true });
       days.push({ title: `✅ DAY ${days.length + 1} – QA, VSS / VCOP SESSIONS`, acts: qaDay(false) });
     } else if (m === "hot") {
@@ -498,22 +729,19 @@
       days.push({ title: "⚡ DAY 1 – PREPARATION & IDU / NPU SWAP", acts: c, cut: true });
       days.push({ title: "✅ DAY 2 – QA, VSS / VCOP SESSIONS", acts: qaDay(false) });
     }
-    days.forEach((d, i) => { d.idx = i + 1; d.title = d.title.replace(/DAY \d+/, `DAY ${i + 1}`);
-      const pos = {}; d.acts.forEach((a, k) => pos[a.key] = k + 1);
-      d.acts.forEach(a => { a.afterIdx = a.after.map(k => pos[k]).filter(Boolean); }); });
-    return days;
+    return raw ? days : finalize(state, t, days);
   }
 
   function schedule(state, t) {
     const P = state.project, TRM = state.domain === "TRM", outApproved = hm(P.outStart), outMax = (+P.outMax || 0) * 60;
-    const days = TRM ? trmActivities(state, t) : activities(state, t);
-    if (TRM) days.forEach(d => {
+    const days = TRM ? trmActivities(state, t) : finalize(state, t, ranBuild(state, t));
+    days.forEach(d => {
       if (!d.cut) { d.arrive = hm(P.arrive); return; }
       // team arrives just in time: approved outage start minus the preparation chain before the outage
       d.acts.forEach(a => { a.start = a.afterIdx.length ? Math.max(...a.afterIdx.map(k => d.acts[k - 1].end)) : 0; a.end = a.start + a.dur; });
-      const first = d.acts.find(a => a.atOutage); d.lead = first ? first.start : 0; d.arrive = Math.max(0, outApproved - d.lead);
+      const first = d.acts.find(a => a.atOutage); d.lead = first ? first.start : 0;
+      const jit = outApproved - d.lead; d.arrive = jit >= 360 ? jit : hm(P.arrive); d.lateArrive = jit < 360;
     });
-    days.forEach(d => { if (!TRM && d.cut) d.lead = leadMin(state); });
     days.forEach(d => {
       d.acts.forEach(a => {
         a.start = a.afterIdx.length ? Math.max(...a.afterIdx.map(k => d.acts[k - 1].end)) : d.arrive;
@@ -522,9 +750,10 @@
       });
       d.leave = Math.max(...d.acts.map(a => a.end)); d.hours = d.leave - d.arrive;
     });
-    const cd = days.find(d => d.cut), out = cd.acts.filter(a => a.impact === "Outage");
-    const oS = Math.min(...out.map(a => a.start)), oE = Math.max(...out.map(a => a.end));
+    const cd = days.find(d => d.cut), out = cd ? cd.acts.filter(a => a.impact === "Outage") : [];
     const allowedEnd = outApproved + outMax;
+    if (!out.length) return { days, cutIdx: 0, noOutage: true, outage: 0, outStart: 0, outEnd: 0, outApproved, allowedEnd, outMax, outOk: true, total: days.reduce((a, d) => a + d.hours, 0) };
+    const oS = Math.min(...out.map(a => a.start)), oE = Math.max(...out.map(a => a.end));
     return { days, cutIdx: cd.idx, outage: oE - oS, outStart: oS, outEnd: oE, outApproved, allowedEnd, outMax,
       outOk: oE <= allowedEnd + 0.5 && oE - oS <= outMax + 0.5, total: days.reduce((a, d) => a + d.hours, 0) };
   }
@@ -569,7 +798,7 @@
     const U1 = TRM ? "link" : "site", Us = TRM ? "links" : "sites", UU = TRM ? "Link" : "Site";
     const types = state.types.map((t, i) => Object.assign({}, t, { color: COLORS[i % COLORS.length], sch: schedule(state, t) }));
     const sites = sitesOf(state);
-    const ND = TRM ? Math.max(...types.map(t => t.sch.days.length)) : daysOf(P), CUT = TRM ? 0 : cutDayOf(P);
+    const ND = Math.max(...types.map(t => t.sch.days.length)), CUT = 0;
     const dBy = Object.fromEntries(types.map(t => [t.name, t.sch.days.length])), cBy = Object.fromEntries(types.map(t => [t.name, t.sch.cutIdx]));
     const plan = planDates(state, sites, dBy, cBy);
     const siteDays = sites.reduce((a, x) => a + (dBy[x.type] || 0), 0);
@@ -602,7 +831,7 @@
         const br = r, dn = di + 1;
         ws.mergeCells(r, 1, r, 5); put(ws, r, 1, d.title, { font: { bold: true, ...WHITEF }, fill: TEAL, al: LFT });
         put(ws, r, 6, "Arrive", { font: { bold: true, ...WHITEF }, fill: TEAL, al: CEN });
-        put(ws, r, 7, fx(d.cut ? (TRM ? `${DB("outStart")}-${d.lead}/1440` : DB("cutArrive")) : DB("arrive"), d.arrive / 1440), { font: { bold: true, color: { argb: "FF008000" } }, fill: IN, al: CEN, fmt: "hh:mm" });
+        put(ws, r, 7, fx(d.cut && !d.lateArrive ? `${DB("outStart")}-${d.lead}/1440` : DB("arrive"), d.arrive / 1440), { font: { bold: true, color: { argb: "FF008000" } }, fill: IN, al: CEN, fmt: "hh:mm" });
         put(ws, r, 8, "Leave", { font: { bold: true, ...WHITEF }, fill: TEAL, al: CEN });
         for (let s = 0; s < NS; s++) put(ws, r, G0 + s, fx(`$G$${br}+${s}/48`, (d.arrive + s * 30) / 1440), { font: { size: 7, bold: true, ...WHITEF }, fill: TEAL, al: { textRotation: 90, horizontal: "center" }, fmt: "hh:mm" });
         ws.getRow(r).height = 34; r++;
@@ -643,8 +872,8 @@
       });
       ws.addConditionalFormatting({ ref: `E7:E${r}`, rules: [{ type: "expression", priority: 8, formulae: ['$E7="Outage"'], style: Object.assign(cfFill("FFE3E3"), { font: { bold: true, color: { argb: "FFC00000" } } }) }] });
       ws.addConditionalFormatting({ ref: `D7:D${r}`, rules: [{ type: "expression", priority: 9, formulae: ['LEFT($D7,6)="Remote"'], style: { font: { bold: true, color: { argb: "FF9C36B5" } } } }] });
-      const o = info.find(x => x.cut);
-      const oS = `_xlfn.MINIFS(H${o.first}:H${o.last},E${o.first}:E${o.last},"Outage")`, oE = `_xlfn.MAXIFS(I${o.first}:I${o.last},E${o.first}:E${o.last},"Outage")`;
+      const o = S.noOutage ? null : info.find(x => x.cut);
+      const oS = o ? `_xlfn.MINIFS(H${o.first}:H${o.last},E${o.first}:E${o.last},"Outage")` : "0", oE = o ? `_xlfn.MAXIFS(I${o.first}:I${o.last},E${o.first}:E${o.last},"Outage")` : "0";
       // KPI strip (row 4 labels, row 5 values) in consecutive columns B..
       const ks = S.days.map((d, i) => [`Day ${i + 1}`, `I${info[i].br}-G${info[i].br}`, d.hours]);
       ks.push(["🔴 Outage", `${oE}-${oS}`, S.outage]);
@@ -664,6 +893,7 @@
       const okF = `IF(AND(${CL(hs + 1)}5<=${DB("outStart")}+${DB("outMax")}/24+0.0001,(${CL(hs + 1)}5-${CL(hs)}5)*24<=${DB("outMax")}+0.001),"✔ within allowed","⚠ exceeds allowed")`;
       put(ws, 5, hs + 2, fx(okF, S.outOk ? "✔ within allowed" : "⚠ exceeds allowed"), { font: { size: 7, color: { argb: "FF999999" } }, border: false });
       ws.mergeCells(5, G0, 5, G0 + 15);
+      if (S.noOutage) put(ws, 5, G0, "🟢 No outage for this MOP type", { font: { bold: true, color: { argb: "FF2B8A3E" } }, fill: "D3F9D8", al: CEN }); else
       put(ws, 5, G0, fx(`"🔴 Outage (Day ${S.cutIdx}): "&TEXT(${CL(hs)}5,"hh:mm")&" → "&TEXT(${CL(hs + 1)}5,"hh:mm")&"   |   allowed: "&TEXT(${DB("outStart")},"hh:mm")&" → "&TEXT(${DB("outStart")}+${DB("outMax")}/24,"hh:mm")&" ("&${DB("outMax")}&" h)   "&${CL(hs + 2)}5`,
         `🔴 Outage (Day ${S.cutIdx}): ${clock(S.outStart)} → ${clock(S.outEnd)}   |   allowed: ${clock(S.outApproved)} → ${clock(S.allowedEnd)} (${P.outMax} h)   ${S.outOk ? "✔ within allowed" : "⚠ exceeds allowed"}`),
         { font: { bold: true, color: { argb: "FFC92A2A" } }, fill: "FFE3E3", al: CEN });
@@ -682,7 +912,7 @@
     banner(cn, "🔌 Connections – what connects to what", TRM ? "Exact ports per approved LB. Qty per link end (x2 for both ends) in blue." : "Exact ports per approved design / RND. Qty per site type in blue. 'Step' = MOP step where it is done.", 6 + nT);
     navbar(cn, 3);
     hdr(cn, 5, 1, ["#", "From", "To", "Cable / type", ...types.map(t => t.name), "Step", "Remarks"]);
-    const airDay = ND === 4 ? "2" : `1 / ${CUT}`;
+    const airDay = "AIR install day";
     const ROLES = [...new Set(types.flatMap(t => unitsOf(t).map(u => u.role || "Radio")))];
     const trmConn = [
       ["ML 66xx / IDU (MMU)", "Radio units (RAU / ML 6352)", "IF / fiber cable", t => sumQ(unitsOf(t).filter(u => trmCat(u) === "rad")), "Day 1 (per end)", "Label both ends; continuity test"],
@@ -695,15 +925,15 @@
       ["All new units", "Site ground bar", "Grounding cable", t => sumQ(unitsOf(t)), "Day 1 (per end)", "Antenna, radios, IDU"],
     ];
     const conn = TRM ? trmConn : [
-      ...ROLES.map(role => [newName, role, "Fiber CPRI + SFP", t => sumQ(unitsOf(t).filter(u => (u.role || "Radio") === role)), /AIR|5G|NR/i.test(role) ? `Day ${airDay}` : "Day 1", "One per unit"]),
-      ...OLDB.map(b => [`${b.model} (reused${b.tech ? ", " + b.tech : ""})`, "New radios", "Fiber CPRI + SFP", () => +b.qty, `Day ${CUT} (outage)`, "Re-home during outage"]),
+      ...ROLES.map(role => [newName, role, "Fiber CPRI + SFP", t => sumQ(unitsOf(t).filter(u => (u.role || "Radio") === role)), /AIR|5G|NR/i.test(role) ? airDay : "Day 1", "One per unit"]),
+      ...OLDB.map(b => [`${b.model} (reused${b.tech ? ", " + b.tech : ""})`, "New radios", "Fiber CPRI + SFP", () => +b.qty, "Cutover (outage)", "Re-home during outage"]),
       ...NEWB.map(b => ["Rectifier / PDU", b.model, "DC power + CB", () => +b.qty, "Day 1", ""]),
       ...(state.rbs || []).filter(r => r.type && +r.qty > 0).map(r => ["Rectifier / PDU", r.type, "DC power + CB", () => +r.qty, "Day 1", "New RBS"]),
       ["Rectifier / PDU", "Radios", "DC power cable + CB", t => sumQ(radiosOf(t)), "Day 1", ""],
-      ["Rectifier / PDU", "AIRs", "DC power cable + CB", t => sumQ(airsOf(t)), `Day ${airDay}`, ""],
-      ["Radios", "Existing antennas", "RF jumpers (per port map)", () => "map", `Day ${CUT} (outage)`, "Torque + weatherproof"],
-      [newName, "TX / MW / router", "Ethernet / fiber backhaul", () => 1, `Day 1 / ${CUT}`, "New port Day 1, migration on cutover"],
-      ["Site alarms", "New / reused basebands", "Alarm cable", () => 1, `Day ${CUT}`, ""],
+      ["Rectifier / PDU", "AIRs", "DC power cable + CB", t => sumQ(airsOf(t)), airDay, ""],
+      ["Radios", "Existing antennas", "RF jumpers (per port map)", () => "map", "Cutover (outage)", "Torque + weatherproof"],
+      [newName, "TX / MW / router", "Ethernet / fiber backhaul", () => 1, "Day 1 / cutover", "New port Day 1, migration on cutover"],
+      ["Site alarms", "New / reused basebands", "Alarm cable", () => 1, "Cutover day", ""],
       ["All new units", "Site ground bar", "Grounding cable", t => sumQ(unitsOf(t)) + bbQty(state, "New") + (state.rbs || []).reduce((a, r) => a + (r.type ? +r.qty || 0 : 0), 0), "Day 1", "Radios + AIRs + new basebands + RBS"],
     ];
     conn.forEach(([a, b, c, q, s, rm], i) => {
@@ -717,7 +947,7 @@
     cn.getColumn(5 + nT).width = 14; cn.getColumn(6 + nT).width = 30;
 
     // ---------- Site Tracker ----------
-    banner(st, `📅 ${UU} Tracker – auto schedule & progress`, TRM ? `Dates planned from project start, days per link type and number of teams (${wk(P).label}). Dates are values – edit blue cells as needed.` : `Dates auto-planned from project start, days per site and number of teams (${wk(P).label}). Override blue cells if needed.`, TRM ? 13 : 11);
+    banner(st, `📅 ${UU} Tracker – auto schedule & progress`, `Dates planned from project start, days per ${U1} type and number of teams (${wk(P).label}). Dates are values – edit blue cells as needed.`, TRM ? 13 : 11);
     navbar(st, 3);
     hdr(st, 5, 1, TRM ? ["#", "Link ID", "Link type", "Team", "Start (Day 1)", "Outage day", "End (last day)", "Status", "Progress", "Region", "Remarks", "Site A", "Site B"]
       : ["#", "Site ID", "Site type", "Team", "Start (Day 1)", "Cutover day", "End (last day)", "Status", "Progress", "Region", "Remarks"]);
@@ -730,13 +960,13 @@
       put(st, r, 1, i + 1, { al: CEN });
       put(st, r, 2, s.id, { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN });
       put(st, r, 3, s.type, { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN }); st.getCell(r, 3).dataValidation = { type: "list", allowBlank: true, formulae: [typeList] };
-      if (TRM) {
+      if (true) {
         const pd = plan[i];
         put(st, r, 4, pd.team, { al: CEN, fmt: '"Team "0' });
         put(st, r, 5, xl(pd.start), { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN, fmt: "ddd dd-mmm" });
         put(st, r, 6, xl(pd.cut), { font: { bold: true, color: { argb: "FFC92A2A" } }, fill: IN, al: CEN, fmt: "ddd dd-mmm" });
         put(st, r, 7, xl(pd.end), { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN, fmt: "ddd dd-mmm" });
-        put(st, r, 12, s.a || "", { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN }); put(st, r, 13, s.b || "", { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN });
+        if (TRM) { put(st, r, 12, s.a || "", { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN }); put(st, r, 13, s.b || "", { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN }); }
       } else {
       put(st, r, 4, fx(`MOD(A${r}-1,${DB("teams")})+1`, (i % teams) + 1), { al: CEN, fmt: '"Team "0' });
       put(st, r, 5, fx(`WORKDAY.INTL(${DB("start")}-1,1+INT((A${r}-1)/${DB("teams")})*${DB("days")},${code})`, xl(d1)), { fill: IN, al: CEN, fmt: "ddd dd-mmm" });
@@ -761,19 +991,20 @@
     banner(db, `📡 ${P.name}${P.country ? " – " + P.country : ""} – ${TRM ? "TRM (MW link)" : "RAN"} Installation Dashboard`, TRM ? `TRM • days per link from the swap method • day-time work only • ${sites.length} links • ${nT} link types` : `${ND} days per site • day-time work only • remote integration in parallel with field work • ${sites.length} sites • ${nT} equipment types • BB: ${bbText(state)}`, Math.max(14, lastDbCol));
     navbar(db, 3);
     const LEAD = leadMin(state);
-    const maxLead = TRM ? Math.max(...types.map(t => t.sch.days.find(d => d.cut).lead || 0)) : LEAD;
-    const inputs = [["👷 Team on site (normal days)", hm(P.arrive) / 1440, "hh:mm"], [TRM ? "👷 Team on site – outage day (auto, earliest type)" : `👷 Team on site – cutover day (auto)`, fx(`${IC.outStart}-${maxLead}/1440`, Math.max(0, hm(P.outStart) - maxLead) / 1440), "hh:mm", "auto"],
+    const leads = types.map(t => t.sch.days.find(d => d.cut && !d.lateArrive)).filter(Boolean).map(d => d.lead || 0);
+    const maxLead = leads.length ? Math.max(...leads) : 0;
+    const inputs = [["👷 Team on site (normal days)", hm(P.arrive) / 1440, "hh:mm"], ["👷 Team on site – outage day (auto, earliest type)", fx(`${IC.outStart}-${maxLead}/1440`, Math.max(0, hm(P.outStart) - maxLead) / 1440), "hh:mm", "auto"],
       ["🔴 Approved outage start", hm(P.outStart) / 1440, "hh:mm"], ["⏳ Max outage allowed (h)", +P.outMax, "0.0"],
-      ["⏱ Max working hours / day", +P.maxHours, "0.0"], TRM ? ["📆 Days per link", "per method", "@", "auto"] : ["📆 Days per site", ND, "0"],
+      ["⏱ Max working hours / day", +P.maxHours, "0.0"], [TRM ? "📆 Days per link" : "📆 Days per site", "per type", "@", "auto"],
       ["🚀 Project start date", xl(start), "ddd dd-mmm-yyyy"], ["👥 Teams in parallel", +P.teams, "0"]];
     inputs.forEach(([l, v, f, auto], i) => {
       const r = 4 + i; db.mergeCells(r, 1, r, 2);
       put(db, r, 1, l, { font: { bold: true }, fill: "E8EEF6", al: LFT });
       put(db, r, 3, v, { font: { bold: true, color: { argb: auto ? "FF000000" : "FF0000FF" } }, fill: auto ? "E9ECEF" : IN, al: CEN, fmt: f });
     });
-    db.getCell(5, 4).value = TRM ? "= outage start − prep (per link type)" : `= outage start − ${fmt(LEAD)} prep`; db.getCell(5, 4).font = F({ size: 8, italic: true, color: { argb: "FF666666" } });
+    db.getCell(5, 4).value = `= outage start − prep (per ${U1} type)`; db.getCell(5, 4).font = F({ size: 8, italic: true, color: { argb: "FF666666" } });
     db.mergeCells(13, 1, 15, 3);
-    put(db, 13, 1, TRM ? `ℹ Outage start / allowed hours: change C6–C7 → outage-day arrival and the first outage step move with it; the outage closes when the NOC confirms all sites up, and each link type is flagged if it runs over.\nℹ Days per link follow the swap method chosen in the MOP Generator.` : `ℹ Outage start / allowed hours: change C6–C7 → cutover-day arrival and power-off move with it, outage still closes when 'Cells on air' is done, and each type is flagged if it runs over.\nℹ Days per site (C9) updates the tracker & site-days; to move activities between days, change it in the MOP Generator and regenerate.`, { font: { size: 9, italic: true, bold: true, color: { argb: "FFC92A2A" } }, al: LFT, border: false });
+    put(db, 13, 1, TRM ? `ℹ Outage start / allowed hours: change C6–C7 → outage-day arrival and the first outage step move with it; the outage closes when the NOC confirms all sites up, and each link type is flagged if it runs over.\nℹ Days per link follow the swap method chosen in the MOP Generator.` : `ℹ Outage start / allowed hours: change C6–C7 → cutover-day arrival and power-off move with it, outage still closes when 'Cells on air' is done, and each type is flagged if it runs over.\nℹ Days per site and the steps of each day come from the MOP type chosen in the MOP Generator (steps can be added, removed or moved there).`, { font: { size: 9, italic: true, bold: true, color: { argb: "FFC92A2A" } }, al: LFT, border: false });
     const H0 = 17, T0 = 18, TL = T0 + nT - 1;
     const dayCols = Array.from({ length: ND }, (_, i) => 6 + i), cOut = 6 + ND, cTot = cOut + 1, cSum = cOut + 2, cStat = cOut + 3, cWin = cOut + 4;
     const lastDay = sites.length ? new Date(Math.max(...plan.map(x => x.end.getTime()))) : new Date(P.startDate + "T00:00:00Z");
@@ -792,8 +1023,8 @@
     });
     db.mergeCells(10, 5, 11, 14);
     put(db, 10, 5, TRM ? fx(`"Outage allowed "&TEXT(${IC.outStart},"hh:mm")&" → "&TEXT(${IC.outStart}+${IC.outMax}/24,"hh:mm")&"  •  team arrives just in time for the outage  •  rollback plan in every outage day"`,
-      `Outage allowed ${clock(hm(P.outStart))} → ${clock(hm(P.outStart) + P.outMax * 60)}  •  team arrives just in time for the outage  •  rollback plan in every outage day`) : fx(`"Outage allowed "&TEXT(${IC.outStart},"hh:mm")&" → "&TEXT(${IC.outStart}+${IC.outMax}/24,"hh:mm")&" (cutover day ${CUT})  •  "&${IC.days}&" days per site  •  24h KPI check remote"`,
-      `Outage allowed ${clock(hm(P.outStart))} → ${clock(hm(P.outStart) + P.outMax * 60)} (cutover day ${CUT})  •  ${ND} days per site  •  24h KPI check remote`), { font: { italic: true, bold: true, color: { argb: ARGB(TEAL) } }, al: LFT, border: false });
+      `Outage allowed ${clock(hm(P.outStart))} → ${clock(hm(P.outStart) + P.outMax * 60)}  •  team arrives just in time for the outage  •  rollback plan in every outage day`) : fx(`"Outage allowed "&TEXT(${IC.outStart},"hh:mm")&" → "&TEXT(${IC.outStart}+${IC.outMax}/24,"hh:mm")&"  •  days per site set by the MOP type  •  24h KPI check remote"`,
+      `Outage allowed ${clock(hm(P.outStart))} → ${clock(hm(P.outStart) + P.outMax * 60)}  •  days per site set by the MOP type  •  24h KPI check remote`), { font: { italic: true, bold: true, color: { argb: ARGB(TEAL) } }, al: LFT, border: false });
     const H = { 1: `${UU} type`, 2: TRM ? "Method / equipment (per end)" : "Equipment", 4: TRM ? "Links" : "Sites", 5: "Days" };
     dayCols.forEach((c, i) => H[c] = `Day ${i + 1}${!TRM && i + 1 === CUT ? " ⚡" : ""}`);
     Object.assign(H, { [cOut]: "🔴 Outage", [cTot]: `⏱ Total / ${U1}`, [cSum]: `Σ all ${Us}`, [cStat]: "Status", [cWin]: "🔴 Outage window" });
@@ -804,7 +1035,7 @@
       put(db, r, 1, { text: t.name, hyperlink: `#'${t.sheet}'!A1` }, { font: { bold: true, underline: true, ...WHITEF }, fill: t.color, al: CEN });
       db.mergeCells(r, 2, r, 3); put(db, r, 2, `${TRM ? (TRM_METHODS[t.method] || TRM_METHODS.normal).label + (t.sd ? " + SD" : "") + ": " : ""}${equipTxt(t)}${t.reuseCabling ? " (reuse cabling)" : ""}`, { font: { size: 9 } });
       put(db, r, 4, fx(`COUNTIF('Site Tracker'!$C$6:$C$${L},"${t.name}")`, n), { font: { bold: true }, al: CEN });
-      put(db, r, 5, TRM ? S.days.length : fx(IC.days, ND), { al: CEN });
+      put(db, r, 5, S.days.length, { al: CEN });
       dayCols.forEach((c, i) => put(db, r, c, S.days[i] ? fx(`${s}${K["d" + (i + 1)]}`, S.days[i].hours / 1440) : null, { al: CEN, fmt: "[h]:mm", fill: S.days[i] ? null : "F2F4F7",
         font: S.days[i] && S.days[i].cut ? { bold: true, color: { argb: "FFC92A2A" } } : { bold: false } }));
       put(db, r, cOut, fx(`${s}${K.Outage}`, S.outage / 1440), { font: { bold: true, color: { argb: "FFC00000" } }, al: CEN, fmt: "[h]:mm" });
@@ -813,7 +1044,7 @@
       const dayOk = S.days.every(d => d.hours / 60 <= +P.maxHours + 0.001);
       put(db, r, cStat, fx(`IF(MAX(${CL(dayCols[0])}${r}:${CL(dayCols[ND - 1])}${r})*24>${IC.maxHours}+0.001,"⚠ day > max hours",IF(LEFT(${s}${K.OutOk},1)="⚠","⚠ outage > allowed","✔ OK"))`,
         !dayOk ? "⚠ day > max hours" : !S.outOk ? "⚠ outage > allowed" : "✔ OK"), { font: { bold: true }, al: CEN });
-      put(db, r, cWin, fx(`TEXT(${s}${K.OutS},"hh:mm")&" → "&TEXT(${s}${K.OutE},"hh:mm")`, `${clock(S.outStart)} → ${clock(S.outEnd)}`), { font: { size: 9, bold: true, color: { argb: "FFC92A2A" } }, al: CEN });
+      put(db, r, cWin, S.noOutage ? "No outage" : fx(`TEXT(${s}${K.OutS},"hh:mm")&" → "&TEXT(${s}${K.OutE},"hh:mm")`, `${clock(S.outStart)} → ${clock(S.outEnd)}`), { font: { size: 9, bold: true, color: { argb: "FFC92A2A" } }, al: CEN });
       db.getRow(r).height = 30;
     });
     const tr = TL + 1;
@@ -822,6 +1053,10 @@
     put(db, tr, 4, fx(`SUM(D${T0}:D${TL})`, sites.length), { font: { bold: true, ...WHITEF }, fill: NAVY, al: CEN });
     put(db, tr, 5, fx(`SUMPRODUCT(D${T0}:D${TL},E${T0}:E${TL})`, siteDays), { font: { bold: true, ...WHITEF }, fill: NAVY, al: CEN, fmt: `0" ${U1}-days"` });
     put(db, tr, cSum, fx(`SUM(${CL(cSum)}${T0}:${CL(cSum)}${TL})`, types.reduce((a, t) => a + sites.filter(x => x.type === t.name).length * t.sch.total, 0) / 1440), { font: { bold: true, ...WHITEF }, fill: NAVY, al: CEN, fmt: "[h]:mm" });
+    const d0 = String(state.d0 || "").split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    if (d0.length) { const r0 = tr + 2; db.mergeCells(r0, 1, r0, 6);
+      put(db, r0, 1, "📋 D0 – preparation the day before (off-site, not in the site timeline)", { font: { bold: true, ...WHITEF }, fill: TEAL, al: LFT });
+      d0.forEach((x, i) => { db.mergeCells(r0 + 1 + i, 1, r0 + 1 + i, 6); put(db, r0 + 1 + i, 1, "☐  " + x, { al: LFT }); }); }
     const sR = `${CL(cStat)}${T0}:${CL(cStat)}${TL}`;
     db.addConditionalFormatting({ ref: sR, rules: [
       { type: "expression", priority: 1, formulae: [`LEFT(${CL(cStat)}${T0},1)="⚠"`], style: Object.assign(cfFill("FFE3E3"), { font: { bold: true, color: { argb: "FFC92A2A" } } }) },
@@ -847,7 +1082,7 @@
     const U1 = TRM ? "link" : "site", Us = TRM ? "links" : "sites";
     const types = state.types.map((t, i) => Object.assign({}, t, { color: COLORS[i % COLORS.length], sch: schedule(state, t) }));
     const sites = sitesOf(state);
-    const ND = TRM ? Math.max(...types.map(t => t.sch.days.length)) : daysOf(P), CUT = TRM ? 0 : cutDayOf(P);
+    const ND = Math.max(...types.map(t => t.sch.days.length)), CUT = 0;
     const dBy = Object.fromEntries(types.map(t => [t.name, t.sch.days.length])), cBy = Object.fromEntries(types.map(t => [t.name, t.sch.cutIdx]));
     const plan = planDates(state, sites, dBy, cBy);
     const siteDays = sites.reduce((a, x) => a + (dBy[x.type] || 0), 0);
@@ -879,18 +1114,18 @@
       body: TRM ? [["Days per link", "Set by the swap method of each link type (see table)"], ["Team on site", `${P.arrive}; on the outage day the team arrives just in time for the approved outage start`],
         ["Allowed outage", allowed], ["Rollback", "Every outage day has a rollback decision – old link kept until NOC confirms all sites up"], ["Working day limit", `${P.maxHours} h, day-time only`],
         ["Teams / start", `${P.teams} teams from ${P.startDate} – finish ${finish.toISOString().slice(0, 10)}`]]
-      : [["Days per site", `${ND} (cutover on Day ${cutDayOf(P)})`], ["Team on site", `${P.arrive} (cutover day ${clock(cutArrive(state))} – ${fmt(leadMin(state))} h before outage)`],
+      : [["Days per site", "Set by the MOP type of each site type (see table)"], ["Team on site", `${P.arrive}; on the cutover day the team arrives just in time for the approved outage start`],
         ["Allowed outage", allowed], ["Basebands", clean(bbText(state))], ["Working day limit", `${P.maxHours} h, day-time only`],
         ["Teams / start", `${P.teams} teams from ${P.startDate} – finish ${finish.toISOString().slice(0, 10)}`]] });
     y = doc.lastAutoTable.finalY + 7;
     doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text(TRM ? "Link types at a glance" : "Site types at a glance", M0, y); y += 2;
-    const dh = Array.from({ length: ND }, (_, i) => `Day ${i + 1}${!TRM && i + 1 === cutDayOf(P) ? " (cutover)" : ""}`);
+    const dh = Array.from({ length: ND }, (_, i) => `Day ${i + 1}`);
     doc.autoTable({ startY: y, margin: { left: M0, right: M0 }, styles: { fontSize: 9, cellPadding: 1.8, valign: "middle" },
       headStyles: { fillColor: rgb("2E3B55"), textColor: 255 },
       head: [["Type", TRM ? "Method / equipment per end" : "Equipment", TRM ? "Links" : "Sites", ...dh, "Outage window", "Status"]],
       body: types.map(t => [t.name, clean((TRM ? (TRM_METHODS[t.method] || TRM_METHODS.normal).label + (t.sd ? " + SD" : "") + ": " : "") + equipTxt(t)), sites.filter(s => s.type === t.name).length,
-        ...Array.from({ length: ND }, (_, i) => t.sch.days[i] ? `${clock(t.sch.days[i].arrive)}-${clock(t.sch.days[i].leave)}\n${fmt(t.sch.days[i].hours)} h${t.sch.days[i].cut && TRM ? " *" : ""}` : "-"),
-        `${clock(t.sch.outStart)} -> ${clock(t.sch.outEnd)}\n${fmt(t.sch.outage)} h`,
+        ...Array.from({ length: ND }, (_, i) => t.sch.days[i] ? `${clock(t.sch.days[i].arrive)}-${clock(t.sch.days[i].leave)}\n${fmt(t.sch.days[i].hours)} h${t.sch.days[i].cut && !t.sch.noOutage ? " *" : ""}` : "-"),
+        t.sch.noOutage ? "No outage" : `${clock(t.sch.outStart)} -> ${clock(t.sch.outEnd)}\n${fmt(t.sch.outage)} h`,
         t.sch.days.some(d => d.hours / 60 > +P.maxHours + 0.001) ? "! day too long" : t.sch.outOk ? "OK" : "! outage over allowed"]),
       didParseCell: h => { if (h.section === "body" && h.column.index === 0) { h.cell.styles.fillColor = rgb(types[h.row.index].color); h.cell.styles.textColor = 255; h.cell.styles.fontStyle = "bold"; }
         if (h.section === "body" && h.column.index === 4 + ND) { const ok = String(h.cell.raw) === "OK"; h.cell.styles.textColor = ok ? rgb("2B8A3E") : rgb("C92A2A"); h.cell.styles.fontStyle = "bold"; } } });
@@ -898,7 +1133,7 @@
     if (y > Hh - 34) { doc.addPage(); head(`Installation MOP – ${title}`, "How to read this document"); y = 30; }
     doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text("How to read the pages that follow", M0, y); y += 5;
     doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(74, 88, 104);
-    [TRM ? "* = outage day. One page per link type and day: step, activity, who does it, start / end time and a bar on the day's timeline." : "One page per site type and day: step number, activity, who does it, start and end time, and a bar on the day's timeline.",
+    ["* = outage day. D0 preparation (day before) is listed on page 1 of the Excel Dashboard.", TRM ? "One page per link type and day: step, activity, who does it, start / end time and a bar on the day's timeline." : "One page per site type and day: step number, activity, who does it, start and end time, and a bar on the day's timeline.",
      "Red rows are inside the outage. The outage starts at the approved time and ends when all cells are back on air.",
      "Purple rows are done remotely by the integrator, in parallel with the field team.",
      "Full details (step descriptions, dependencies, connections, site tracker) are in the Excel MOP."].forEach(t => { doc.text("•  " + t, M0, y); y += 5; });
@@ -913,7 +1148,7 @@
         doc.text(clean(d.title.replace(/^\S+\s/, "")), M0, 28);
         doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(74, 88, 104);
         let line = `On site ${clock(d.arrive)} -> ${clock(d.leave)}  (${fmt(d.hours)} h)`;
-        if (d.cut) line += `   |   Outage ${clock(S.outStart)} -> ${clock(S.outEnd)} (${fmt(S.outage)} h), allowed ${allowed}  ${S.outOk ? "OK" : "! exceeds"}`;
+        if (d.cut && !S.noOutage) line += `   |   Outage ${clock(S.outStart)} -> ${clock(S.outEnd)} (${fmt(S.outage)} h), allowed ${allowed}  ${S.outOk ? "OK" : "! exceeds"}`;
         doc.text(line, M0, 33.5); doc.setTextColor(23, 34, 48);
         const span = Math.max(+P.maxHours * 60, d.hours, d.cut ? S.allowedEnd - d.arrive : 0);
         const TLW = 108;
@@ -933,7 +1168,8 @@
             const a = d.acts[h.row.index]; if (!a.dur) return;
             doc.setFillColor(...rgb(colOf(a))); doc.rect(x0 + (a.start - d.arrive) / span * w, yy + hh * 0.25, Math.max(0.8, a.dur / span * w), hh * 0.5, "F");
           } });
-        let yy = doc.lastAutoTable.finalY + 6; if (yy > Hh - 22) { doc.addPage(); yy = 28; }
+        let yy = doc.lastAutoTable.finalY + 6;
+        if (S.noOutage) {} if (yy > Hh - 22) { doc.addPage(); yy = 28; }
         legend(yy); if (d.cut) { doc.setFillColor(211, 249, 216); doc.rect(M0 + 168, yy - 2.6, 5, 3, "F"); doc.setFontSize(8.5); doc.setTextColor(80, 90, 104); doc.text("Allowed outage window", M0 + 174.5, yy); }
         const notes = d.acts.filter(a => a.rem && /PRIORITY|SKIPPED|OUTAGE|rollback|Heavy|postpone/i.test(a.rem)).map(a => clean(a.name + ": " + a.rem)).slice(0, 5);
         if (notes.length) { yy += 6; doc.setFontSize(8.5); doc.setTextColor(74, 88, 104); doc.setFont("helvetica", "bold"); doc.text("Key notes", M0, yy); doc.setFont("helvetica", "normal");
@@ -946,6 +1182,6 @@
     return doc;
   }
 
-  const api = { planDates, DEFAULT_TRM, TRM_FIXED, TRM_METHODS, trmCat, isAir, equipTxt, unitsOf, buildPdf, leadMin, cutArrive, WEEKEND, sub, bbText, bbNames, finishDate, normalize, daysOf, cutDayOf, DEFAULT_STATE, FIXED, schedule, activities, sitesOf, buildWorkbook, fmt, clock, hm, COLORS };
+  const api = { RAN_EXTRA_LIST, RAN_SCEN, autoBalance, removedSteps, planDates, DEFAULT_TRM, TRM_FIXED, TRM_METHODS, trmCat, isAir, equipTxt, unitsOf, buildPdf, leadMin, cutArrive, WEEKEND, sub, bbText, bbNames, finishDate, normalize, daysOf, cutDayOf, DEFAULT_STATE, FIXED, schedule, activities, sitesOf, buildWorkbook, fmt, clock, hm, COLORS };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.MOP = api;
 })(typeof window !== "undefined" ? window : globalThis);

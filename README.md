@@ -57,6 +57,15 @@ Dockerfile, nginx.conf, docker-compose.yml
 
 ## Changelog
 
+**v2.1.0**
+- RAN MOP types per site type: Swap / modernization (2–4 days, outage), Expansion (1–2 days, short outage),
+  5G AIR add only (1–2 days, no outage), New site build (2–3 days, no outage) – steps from the Senegal RAN MOPs
+- Step editor on the timeline: move any step to another day, change its minutes, remove / restore it, add your own steps
+  (moved and added steps run after the same crew's last step of that day); ⚖ Auto-balance days; ↺ Reset steps
+- D0 day-before checklist (editable) – printed on the Excel Dashboard, kept out of the site timeline
+- TRM: new method "New link (no outage)" (4 days, or 3 with both ends on Day 1); decommissioning can move to the QA day
+- No-outage MOP types handled everywhere (tiles, Excel, PDF); tracker dates planned per type
+
 **v2.0.0 – RAN + TRM**
 - Start screen and top-bar switch: **RAN** (site installation) or **TRM** (MW link installation). Each part keeps its own setup
 - TRM link types with swap method (sets the days): Normal swap 1 team (4 days, or 3 with both ends on Day 1),

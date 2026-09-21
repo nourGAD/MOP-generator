@@ -102,8 +102,28 @@
     "pack": 60,
     "rsc": 60,
     "snags": 30,
-    "closeSite": 15
+    "closeSite": 15,
+    "ehsRsc": 45,
+    "rfi": 30,
+    "preAsm": 60,
+    "connPrep": 30,
+    "enclosure": 30,
+    "encPower": 30,
+    "bbComm": 30,
+    "preInteg": 60,
+    "connect": 30,
+    "integExp": 20,
+    "alarmChk": 30,
+    "srs": 60,
+    "phys": 60,
+    "sealing": 60,
+    "indoorSys": 90,
+    "qaUpload": 120,
+    "rscReview": 60,
+    "docs": 60,
+    "eod": 10
   },
+  "d0": "SID with site-specific connection diagram, MR for the site, RFI confirmation, site access\nMaterial collection booked (48 h before); discrepancies vs SID / MR reported to IM\nBB serial shared for script generation; scripts uploaded (ESI / ZTI) and checked by TL\nSRS data loaded on SRS server\nWhatsApp / Teams group with all stakeholders\nApproved CR available at least 1 day before",
   "types": [
     {
       "name": "Type-1",
@@ -128,7 +148,15 @@
           "qty": 3,
           "min": 60
         }
-      ]
+      ],
+      "scenario": "swap",
+      "days": 2,
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
     },
     {
       "name": "Type-2",
@@ -153,7 +181,15 @@
           "qty": 3,
           "min": 45
         }
-      ]
+      ],
+      "scenario": "swap",
+      "days": 2,
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
     },
     {
       "name": "Type-3",
@@ -178,7 +214,15 @@
           "qty": 3,
           "min": 45
         }
-      ]
+      ],
+      "scenario": "swap",
+      "days": 2,
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
     },
     {
       "name": "Type-4",
@@ -203,7 +247,15 @@
           "qty": 3,
           "min": 40
         }
-      ]
+      ],
+      "scenario": "swap",
+      "days": 2,
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
     }
   ],
   "rbs": [],

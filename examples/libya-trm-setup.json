@@ -1,5 +1,6 @@
 {
   "domain": "TRM",
+  "d0": "Correct LB design available; laptop ready (min 4 GB RAM)\nApproved CR available at least 1 day before site activities\nNo move to site without customer RFI confirmation and SID / TSSR / LB\nOutage plan shared with expected migration date",
   "project": {
     "name": "MW Link Modernization",
     "country": "Libya",
@@ -160,7 +161,13 @@
           "qty": 2,
           "min": 15
         }
-      ]
+      ],
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
     },
     {
       "name": "SC-1 Hot swap",
@@ -182,7 +189,13 @@
           "qty": 2,
           "min": 15
         }
-      ]
+      ],
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
     },
     {
       "name": "SC-2 1+0 to 2+0",
@@ -198,7 +211,13 @@
           "qty": 1,
           "min": 30
         }
-      ]
+      ],
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
     },
     {
       "name": "SC-5 1.2m + SD + IDU",
@@ -232,7 +251,13 @@
           "qty": 1,
           "min": 30
         }
-      ]
+      ],
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
     },
     {
       "name": "SC-8 IDU / NPU swap",
@@ -248,7 +273,13 @@
           "qty": 1,
           "min": 30
         }
-      ]
+      ],
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
     }
   ],
   "siteList": ""

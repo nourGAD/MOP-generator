@@ -60,7 +60,7 @@
   <details class="sec" open><summary>Schedule &amp; outage</summary><div class="body">
     <p class="hint">Set the approved outage start – the team arrives just in time for it on the cutover day. The outage closes when “Cells on air” is done and is flagged if it runs past the allowed hours.</p>
     <div class="grid2">
-      <label class="f ran-only">Days per site<select data-p="daysPerSite" data-num="1"><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option></select></label>
+      
       <label class="f">Team on site (normal days)<input type="time" data-p="arrive"></label>
       <div class="f auto" id="cutLbl">Team on site – cutover day<output id="cutOut">–</output><small>auto: 1 h before outage</small></div>
       <label class="f">Approved outage start<input type="time" data-p="outStart"></label>
@@ -79,6 +79,10 @@
     <datalist id="models"></datalist>
     <div id="types"></div>
     <button class="add" id="addType">Add type</button>
+  </div></details>
+  <details class="sec"><summary>D0 – day-before checklist</summary><div class="body">
+    <p class="hint">Off-site preparation the day before (not part of the site timeline). One item per line – printed on the Excel Dashboard.</p>
+    <textarea id="d0" rows="6"></textarea>
   </div></details>
   <details class="sec"><summary>Install time per unit</summary><div class="body">
     <p class="hint">Minutes to install one unit (bracket, hoist, fix, ground).</p>
@@ -108,6 +112,7 @@
 </main>
 </div>
 <div class="toast" id="toast" role="status"></div>
+<datalist id="stepLib"></datalist>
 
 <script src="vendor/exceljs.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>

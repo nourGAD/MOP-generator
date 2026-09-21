@@ -1,5 +1,5 @@
 // Offline cache for the MOP Generator. Bump VERSION on every release so users get the new files.
-const VERSION = "mop-gen-v2.0.0";
+const VERSION = "mop-gen-v2.1.0";
 const FILES = ["./", "index.html", "css/style.css", "js/core.js", "js/app.js", "vendor/exceljs.min.js", "vendor/jspdf.umd.min.js", "vendor/jspdf.plugin.autotable.min.js",
   "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES))); self.skipWaiting(); });
