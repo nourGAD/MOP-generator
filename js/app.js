@@ -22,9 +22,15 @@ function renderInputs(){
     <div class="head"><label class="f">Name<input type="text" data-t="name" value="${esc(t.name)}"></label>
       <label class="f">Sites<input type="number" min="0" data-t="sites" value="${t.sites}"></label>
       <button class="x" data-del="${i}" aria-label="Remove ${esc(t.name)}" title="Remove">×</button></div>
-    <div class="row"><label class="f">Low-band radio<select data-t="lowModel">${opts("radio",t.lowModel)}</select></label><label class="f">Qty<input type="number" min="0" data-t="lowQty" value="${t.lowQty}"></label></div>
-    <div class="row"><label class="f">Mid-band radio<select data-t="midModel">${opts("radio",t.midModel)}</select></label><label class="f">Qty<input type="number" min="0" data-t="midQty" value="${t.midQty}"></label></div>
-    <div class="row"><label class="f">5G AIR<select data-t="airModel">${opts("air",t.airModel)}</select></label><label class="f">Qty<input type="number" min="0" data-t="airQty" value="${t.airQty}"></label></div>
+    <div class="uh"><span>Part / band · model</span><span>Qty</span><span>Min/unit</span><span></span></div>
+    ${(t.units||[]).map((u,k)=>`<div class="un" data-u="${k}">
+      <input type="text" list="roles" data-uk="role" value="${esc(u.role)}" aria-label="Part or band" placeholder="e.g. Low band">
+      <input type="text" list="models" data-uk="model" value="${esc(u.model)}" aria-label="Model" placeholder="Model">
+      <input type="number" min="0" data-uk="qty" value="${u.qty}" aria-label="Quantity">
+      <input type="number" min="0" data-uk="min" value="${u.min}" aria-label="Minutes per unit">
+      <button class="x" data-udel="${k}" aria-label="Remove part">×</button>
+      <i class="kind ${M.isAir(u)?"air":""}">${M.isAir(u)?"5G AIR step":"Radio step"}</i></div>`).join("")}
+    <button class="add sm" data-uadd="${i}">+ Add part (radio / RRU / AIR)</button>
     <label class="chk"><input type="checkbox" data-t="reuseCabling" ${t.reuseCabling?"checked":""}> Reuse existing cabling (skip cable runs)</label>
    </div>`).join("");
   $("#equip").innerHTML=S.equipment.map((e,i)=>`<div class="eq" data-e="${i}">
@@ -32,6 +38,12 @@ function renderInputs(){
     <select data-k="kind" aria-label="Kind"><option value="radio" ${e.kind==="radio"?"selected":""}>Radio</option><option value="air" ${e.kind==="air"?"selected":""}>AIR</option></select>
     <input type="number" min="0" data-k="min" value="${e.min}" aria-label="Minutes">
     <button class="x" data-edel="${i}" aria-label="Remove model">×</button></div>`).join("");
+  $("#rbsList").innerHTML=S.rbs.map((r,i)=>`<div class="rb" data-r="${i}">
+    <input type="text" data-rb="type" value="${esc(r.type)}" aria-label="RBS type" placeholder="e.g. RBS 6150 outdoor">
+    <input type="number" min="0" max="9" data-rb="qty" value="${r.qty}" aria-label="Quantity">
+    <input type="number" min="0" data-rb="min" value="${r.min}" aria-label="Minutes per unit">
+    <button class="x" data-rdel="${i}" aria-label="Remove RBS">×</button></div>`).join("")||'<p class="hint" style="margin:0 0 8px">No new RBS on this project.</p>';
+  $("#models").innerHTML=S.equipment.map(e=>`<option value="${esc(e.model)}">`).join("");
   $("#bbs").innerHTML=S.basebands.map((b,i)=>`<div class="bb" data-b="${i}">
     <input type="text" data-bb="model" value="${esc(b.model)}" aria-label="Baseband model" placeholder="Model">
     <select data-bb="status" aria-label="New or reused"><option ${b.status==="New"?"selected":""}>New</option><option ${b.status==="Reused"?"selected":""}>Reused</option></select>
@@ -50,7 +62,7 @@ function render(){
   $("#sum").innerHTML=S.types.map((t,i)=>{const r=sch[i],bad=Math.max(...r.days.map(d=>d.hours))>mx+0.5;
     return `<button class="tile" style="--c:${COL(i)}" data-sel="${i}" aria-pressed="${i===sel}">
       <div class="nm"><i></i>${esc(t.name)} <span style="font-weight:500;color:var(--ink-2);font-size:13px">· ${cnt(t.name)} site${cnt(t.name)===1?"":"s"}</span></div>
-      <div class="eqt">${t.lowQty}× ${esc(t.lowModel)} + ${t.midQty}× ${esc(t.midModel)} + ${t.airQty}× ${esc(t.airModel)}</div>
+      <div class="eqt">${esc(M.equipTxt(t))}</div>
       <dl style="grid-template-columns:repeat(${r.days.length+1},1fr)">${r.days.map((d,k)=>`<div><dt>Day ${k+1}${d.cut?" ⚡":""}</dt><dd>${M.fmt(d.hours)}</dd></div>`).join("")}<div><dt>Outage</dt><dd class="o">${M.fmt(r.outage)}</dd></div></dl>
       <span class="flag ${bad||!r.outOk?"bad":""}">${bad?"⚠ Over "+S.project.maxHours+" h – split or add crew":!r.outOk?"⚠ Outage exceeds the allowed "+S.project.outMax+" h":"✔ Fits the day and the outage window"}</span>
     </button>`}).join("");
@@ -88,9 +100,13 @@ document.addEventListener("input",e=>{
   else if(el.dataset.u) S.unit[el.dataset.u]=v;
   else if(el.dataset.f){ S.fixed[el.dataset.f]=v; updCut(); }
   else if(el.id==="sites") S.siteList=el.value;
+  else if(el.dataset.uk){const i=+el.closest(".tcard").dataset.i, k=+el.closest(".un").dataset.u, u=S.types[i].units[k]; u[el.dataset.uk]=v;
+    if(el.dataset.uk==="model"){const e=S.equipment.find(q=>q.model===v); if(e){u.min=+e.min; el.closest(".un").querySelector('[data-uk="min"]').value=u.min}}
+    if(el.dataset.uk==="role"||el.dataset.uk==="model"){const ki=el.closest(".un").querySelector(".kind"); ki.textContent=M.isAir(u)?"5G AIR step":"Radio step"; ki.classList.toggle("air",M.isAir(u))} }
+  else if(el.dataset.rb){const i=+el.closest(".rb").dataset.r; S.rbs[i][el.dataset.rb]=v}
   else if(el.dataset.t){const i=+el.closest(".tcard").dataset.i; S.types[i][el.dataset.t]=v}
   else if(el.dataset.k){const i=+el.closest(".eq").dataset.e, old=S.equipment[i].model; S.equipment[i][el.dataset.k]=v;
-    if(el.dataset.k==="model") S.types.forEach(t=>["lowModel","midModel","airModel"].forEach(k=>{if(t[k]===old)t[k]=v}));
+    if(el.dataset.k==="model") S.types.forEach(t=>(t.units||[]).forEach(u=>{if(u.model===old)u.model=v}));
     if(el.dataset.k!=="min"){ clearTimeout(window._rr); window._rr=setTimeout(()=>{const a=document.activeElement;renderInputs();},600);} }
   else return;
   render();
@@ -99,10 +115,15 @@ document.addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b) return;
   if(b.dataset.sel!==undefined){sel=+b.dataset.sel;render()}
   else if(b.dataset.del!==undefined){if(S.types.length<2){toast("Keep at least one site type.");return} S.types.splice(+b.dataset.del,1);renderInputs();render()}
+  else if(b.dataset.uadd!==undefined){const t=S.types[+b.dataset.uadd]; t.units=t.units||[]; t.units.push({role:"",model:"",qty:3,min:20}); renderInputs(); render();
+    const c=document.querySelector(`.tcard[data-i="${b.dataset.uadd}"]`); const r=c.querySelectorAll('[data-uk="role"]'); r[r.length-1].focus()}
+  else if(b.dataset.udel!==undefined){const i=+b.closest(".tcard").dataset.i; S.types[i].units.splice(+b.dataset.udel,1); renderInputs(); render()}
+  else if(b.dataset.rdel!==undefined){S.rbs.splice(+b.dataset.rdel,1); renderInputs(); render()}
   else if(b.dataset.bdel!==undefined){S.basebands.splice(+b.dataset.bdel,1);renderInputs();render()}
-  else if(b.dataset.edel!==undefined){const m=S.equipment[+b.dataset.edel].model; if(S.types.some(t=>[t.lowModel,t.midModel,t.airModel].includes(m))){toast(m+" is used by a site type – change it there first.");return} S.equipment.splice(+b.dataset.edel,1);renderInputs();render()}
+  else if(b.dataset.edel!==undefined){const m=S.equipment[+b.dataset.edel].model; /* models stay usable as free text */ S.equipment.splice(+b.dataset.edel,1);renderInputs();render()}
 });
-$("#addType").onclick=()=>{const l=S.types[S.types.length-1]; S.types.push(Object.assign({},l,{name:"Type-"+(S.types.length+1),sites:1})); sel=S.types.length-1; renderInputs(); render()};
+$("#addRBS").onclick=()=>{S.rbs.push({type:"",qty:1,min:90}); renderInputs(); render(); const x=document.querySelectorAll('[data-rb="type"]'); x[x.length-1].focus()};
+$("#addType").onclick=()=>{const l=S.types[S.types.length-1]; S.types.push(Object.assign({},JSON.parse(JSON.stringify(l)),{name:"Type-"+(S.types.length+1),sites:1})); sel=S.types.length-1; renderInputs(); render()};
 $("#addBB").onclick=()=>{S.basebands.push({model:"",status:"New",tech:"",qty:1}); renderInputs(); render(); const x=document.querySelectorAll('[data-bb="model"]'); x[x.length-1].focus()};
 $("#addEq").onclick=()=>{S.equipment.push({model:"New model",kind:"radio",min:20}); renderInputs(); render()};
 $("#reset").onclick=()=>{S=M.DEFAULT_STATE(); sel=0; renderInputs(); render(); toast("Default setup restored.")};

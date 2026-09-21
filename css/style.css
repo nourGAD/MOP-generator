@@ -113,3 +113,14 @@ label.ghost{display:inline-flex;align-items:center}
 .gen.alt:hover{background:rgba(242,162,12,.12)}
 .f.auto output{display:block;background:var(--shade);border:1px dashed var(--line);border-radius:5px;padding:7px 8px;font-weight:600;color:var(--ink)}
 .f.auto small{font-size:11px;color:var(--ink-2)}
+
+.uh,.un,.rb{display:grid;grid-template-columns:1fr 1.5fr 46px 52px 22px;gap:5px;align-items:center}
+.un{grid-template-columns:1fr 46px 52px 22px;grid-template-areas:"role qty min x" "model model model model" "kind kind kind kind";padding:6px 0 4px;border-top:1px dashed var(--line)}
+.un [data-uk="role"]{grid-area:role;font-weight:600}.un [data-uk="model"]{grid-area:model}.un [data-uk="qty"]{grid-area:qty}.un [data-uk="min"]{grid-area:min}.un .x{grid-area:x}.un .kind{grid-area:kind}
+.uh:not(.rbh){grid-template-columns:1fr 46px 52px 22px}
+.uh{font-size:11px;color:var(--ink-2);margin:8px 0 3px}
+.un{margin-bottom:2px}.un>*,.rb>*{min-width:0}
+.un .kind{grid-column:1/-1;font-style:normal;font-size:10.5px;color:var(--ink-2);margin:-1px 0 5px 2px}
+.un .kind.air{color:var(--violet)}
+.rb,.rbh{grid-template-columns:1fr 48px 60px 22px}.rb{margin-bottom:6px}
+.add.sm{padding:5px;font-size:12.5px;margin-top:4px}

@@ -33,14 +33,34 @@
     unit: { cableRadio: 15, cableAIR: 20, dismantleRRU: 20, jumperSector: 30 },
     fixed: Object.fromEntries(FIXED.map(f => [f[0], f[2]])),
     types: [
-      { name: "Type-1", sites: 5, lowModel: "Radio 4486 B8B20B28", lowQty: 3, midModel: "Radio 4490 B1B3", midQty: 3, airModel: "AIR 6419 B42", airQty: 3, reuseCabling: false },
-      { name: "Type-2", sites: 14, lowModel: "Radio 4486 B8B20B28", lowQty: 3, midModel: "Radio 4490 B1B3", midQty: 3, airModel: "AIR 3219 B42", airQty: 3, reuseCabling: false },
-      { name: "Type-3", sites: 1, lowModel: "Radio 6646 B8B20B28", lowQty: 1, midModel: "Radio 4490 B1B3", midQty: 3, airModel: "AIR 3219 B42", airQty: 3, reuseCabling: false },
-      { name: "Type-4", sites: 5, lowModel: "Radio 4486 B8B20B28", lowQty: 3, midModel: "Radio 4490 B1B3", midQty: 3, airModel: "AIR 3255 B78AA", airQty: 3, reuseCabling: false },
+      { name: "Type-1", sites: 5, reuseCabling: false, units: [
+        { role: "Low band", model: "Radio 4486 B8B20B28", qty: 3, min: 20 },
+        { role: "Mid band", model: "Radio 4490 B1B3", qty: 3, min: 20 },
+        { role: "5G AIR", model: "AIR 6419 B42", qty: 3, min: 60 } ] },
+      { name: "Type-2", sites: 14, reuseCabling: false, units: [
+        { role: "Low band", model: "Radio 4486 B8B20B28", qty: 3, min: 20 },
+        { role: "Mid band", model: "Radio 4490 B1B3", qty: 3, min: 20 },
+        { role: "5G AIR", model: "AIR 3219 B42", qty: 3, min: 45 } ] },
+      { name: "Type-3", sites: 1, reuseCabling: false, units: [
+        { role: "Low band", model: "Radio 6646 B8B20B28", qty: 1, min: 40 },
+        { role: "Mid band", model: "Radio 4490 B1B3", qty: 3, min: 20 },
+        { role: "5G AIR", model: "AIR 3219 B42", qty: 3, min: 45 } ] },
+      { name: "Type-4", sites: 5, reuseCabling: false, units: [
+        { role: "Low band", model: "Radio 4486 B8B20B28", qty: 3, min: 20 },
+        { role: "Mid band", model: "Radio 4490 B1B3", qty: 3, min: 20 },
+        { role: "5G AIR", model: "AIR 3255 B78AA", qty: 3, min: 40 } ] },
     ],
+    rbs: [],
     siteList: "",
   });
 
+  // a unit is handled as a 5G AIR (installed/cabled with the AIR steps) when its role or model says so
+  const isAir = u => /\b(AIR|5G|NR|AAS|mMIMO)\b/i.test(`${u.role || ""} ${u.model || ""}`);
+  const unitsOf = t => (t.units || []).filter(u => u.model && +u.qty > 0);
+  const radiosOf = t => unitsOf(t).filter(u => !isAir(u)), airsOf = t => unitsOf(t).filter(isAir);
+  const sumQ = L => L.reduce((a, u) => a + (+u.qty || 0), 0), sumMin = L => L.reduce((a, u) => a + (+u.qty || 0) * (+u.min || 0), 0);
+  const listTxt = (L, withRole) => L.map(u => `${u.qty}x ${u.model}${withRole && u.role ? ` (${u.role})` : ""}`).join(" + ");
+  const equipTxt = t => listTxt(unitsOf(t), false) || "no equipment";
   // bring older saved setups up to date
   function normalize(x) {
     const d = DEFAULT_STATE(); const s = Object.assign(d, x || {});
@@ -55,6 +75,16 @@
     s.fixed = Object.assign({}, d.fixed, (x && x.fixed) || {});
     s.unit = Object.assign({}, d.unit, (x && x.unit) || {});
     if (!Array.isArray(s.types) || !s.types.length) s.types = d.types;
+    const libMin = m => { const e = (s.equipment || []).find(q => q.model === m); return e ? +e.min : 20; };
+    s.types = s.types.map(t => {
+      if (Array.isArray(t.units)) return t;
+      const u = [];
+      if (t.lowModel) u.push({ role: "Low band", model: t.lowModel, qty: +t.lowQty || 0, min: libMin(t.lowModel) });
+      if (t.midModel) u.push({ role: "Mid band", model: t.midModel, qty: +t.midQty || 0, min: libMin(t.midModel) });
+      if (t.airModel) u.push({ role: "5G AIR", model: t.airModel, qty: +t.airQty || 0, min: libMin(t.airModel) });
+      return { name: t.name, sites: t.sites, reuseCabling: !!t.reuseCabling, units: u };
+    });
+    if (!Array.isArray(s.rbs)) s.rbs = [];
     return s;
   }
 
@@ -90,11 +120,12 @@
 
   function activities(state, t) {
     const F = state.fixed, U = state.unit, P = state.project, D = daysOf(P), CUT = cutDayOf(P);
-    const nr = (+t.lowQty || 0) + (+t.midQty || 0), na = +t.airQty || 0;
-    const radTxt = [t.lowQty ? `${t.lowQty}x ${short(t.lowModel)}` : "", t.midQty ? `${t.midQty}x ${short(t.midModel)}` : ""].filter(Boolean).join(" + ");
-    const radMin = (+t.lowQty || 0) * equipMin(state, t.lowModel) + (+t.midQty || 0) * equipMin(state, t.midModel);
-    const airMin = na * equipMin(state, t.airModel);
-    const reuse = !!t.reuseCabling, heavy = /6419/.test(t.airModel || "");
+    const RAD = radiosOf(t), AIRS = airsOf(t);
+    const nr = sumQ(RAD), na = sumQ(AIRS);
+    const radTxt = listTxt(RAD, true) || "radios";
+    const radMin = sumMin(RAD), airMin = sumMin(AIRS);
+    const reuse = !!t.reuseCabling, heavy = AIRS.some(u => /6419|64T/.test(u.model));
+    const RBS = (state.rbs || []).filter(r => r.type && +r.qty > 0);
     const newN = bbQty(state, "New"), oldN = bbQty(state, "Reused");
     const NEW = bbNames(state, "New") || "new baseband", OLD = bbNames(state, "Reused");
     const oldTech = bbList(state, "Reused").map(b => b.tech).filter(Boolean).join("/") || "legacy";
@@ -109,11 +140,15 @@
       A("access", "Site access & PTW", "NOC access with CR no." + (note || ""), "All", F.accessN, [], "", note ? "Start time per outage approval" : ""),
       A("safety", "Safety briefing", "Toolbox talk, rigging check, wind check", "All", F.safetyN, ["access"]),
     ];
-    const airInstall = after => A("airs", "Install 5G AIRs", `Install ${na}x ${short(t.airModel)} with brackets; set azimuth & tilt per RND`, "Tower crew", airMin, [after], "", heavy ? "Heavy AIR: hoist + structural approval" : "");
+    const airInstall = after => A("airs", "Install 5G AIRs", na ? `Install ${listTxt(AIRS, true)} with brackets; set azimuth & tilt per RND` : "No 5G AIR in this site type", "Tower crew", airMin, [after], "",
+      !na ? "SKIPPED – no 5G AIR" : heavy ? "Heavy AIR: hoist + structural approval" : "");
     const airCab = (after, rem) => A("airCab", "AIR cabling", `Run & fix DC + fiber for ${na} AIRs to ${NEW}; ground kits; weatherproof; labels`, "Tower crew", reuse ? 0 : na * U.cableAIR, after, "",
       reuse ? "SKIPPED – existing cabling reused" : rem);
+    const rbsActs = RBS.map((r, i) => A("rbs" + i, `Install ${r.type}`, `Install ${r.qty}x ${r.type} (RBS / cabinet) on plinth or wall; grounding, DC feed, cable entry`, "Ground tech",
+      (+r.qty || 0) * (+r.min || 0), [i ? "rbs" + (i - 1) : "material"], "", "New RBS – before baseband installation"));
     const bbTrack = () => [
-      A("bbInst", `Install ${NEW}`, `Mount new baseband(s) in rack/enclosure + grounding${OLD ? ` (${OLD} stays)` : ""}`, "Ground tech", F.bbInstall * newN, ["material"], "", newN ? "Parallel with tower work" : "SKIPPED – no new baseband"),
+      ...rbsActs,
+      A("bbInst", `Install ${NEW}`, `Mount new baseband(s) in ${RBS.length ? RBS.map(r => r.type).join(" / ") : "rack/enclosure"} + grounding${OLD ? ` (${OLD} stays)` : ""}`, "Ground tech", F.bbInstall * newN, [RBS.length ? "rbs" + (RBS.length - 1) : "material"], "", newN ? "Parallel with tower work" : "SKIPPED – no new baseband"),
       A("bbPow", `Power ${NEW}`, "Connect to rectifier CB, check voltage/polarity & capacity", "Ground tech", F.bbPower * newN, ["bbInst"]),
       A("bbSw", `${NEW} SW & config`, "Power up, load SW / site config / licenses", "FE", F.bbSw * newN, ["bbPow"], "", "Pre-stage in WH to save time"),
       A("tn", "Transmission", `Connect ${NEW} to TX (new port), check OSS reachability`, "FE", F.tn, ["bbSw"]),
@@ -150,7 +185,7 @@
     c.push(A("off", "Power off old equipment", "Lock cells (remote), power off old RRUs & old baseband (site)", "Remote integrator + FE", F.powerOff, ["gng"], "Outage",
       "🔴 OUTAGE STARTS – not before approved outage start", { atOutage: true }));
     c.push(A("jump", "Jumper swap", "Per sector: old RRU jumpers off, new radio jumpers to antennas, torque + weatherproof", "Tower crew", (+P.sectors || 3) * U.jumperSector, ["off"], "Outage", "Keep old RRUs mounted (rollback)"));
-    c.push(A("rehome", OLD ? `Re-home ${OLD}` : "Re-home reused baseband", OLD ? `Connect reused baseband(s) (${oldTech}) to new radios (${short(t.lowModel)} / ${short(t.midModel)})` : "No reused baseband",
+    c.push(A("rehome", OLD ? `Re-home ${OLD}` : "Re-home reused baseband", OLD ? `Connect reused baseband(s) (${oldTech}) to new radios (${RAD.map(u => short(u.model)).join(" / ") || "radios"})` : "No reused baseband",
       "Ground tech", F.rehome * oldN, ["off"], "Outage", oldN ? "Parallel with jumper swap" : "SKIPPED – no reused baseband"));
     c.push(A("txmig", "TX migration", `Move backhaul from old BB to ${NEW}`, "FE", F.txmig, ["off"], "Outage", "Parallel with jumper swap"));
     c.push(A("integ", "Integration", `Activate ${NEW}, unlock cells${OLD ? `; activate ${oldTech} on new radios via ${OLD}` : ""}`, "Remote integrator", F.integ, ["jump", "rehome", "txmig"], "Outage", "Remote action"));
@@ -260,8 +295,8 @@
     const G0 = 11, NS = 28, KP = {};
     types.forEach((t, ti) => {
       const ws = tws[ti], last = G0 + NS - 1, S = t.sch;
-      banner(ws, `MOP ${t.name}  |  ${t.lowQty}x ${t.lowModel} + ${t.midQty}x ${t.midModel} + ${t.airQty}x ${t.airModel}`,
-        `BB: ${bbText(state)}   •   Sites: ${t.sites}   •   ${ND} days per site   •   Day-time work only   •   Blue = edit   •   Outage start & allowed hours on Dashboard${t.reuseCabling ? "   •   Existing cabling reused" : ""}`, last);
+      banner(ws, `MOP ${t.name}  |  ${equipTxt(t)}`,
+        `BB: ${bbText(state)}${(state.rbs || []).filter(r => r.type && +r.qty > 0).length ? "   •   RBS: " + state.rbs.filter(r => r.type && +r.qty > 0).map(r => r.qty + "x " + r.type).join(" + ") : ""}   •   Sites: ${t.sites}   •   ${ND} days per site   •   Day-time work only   •   Blue = edit   •   Outage start & allowed hours on Dashboard${t.reuseCabling ? "   •   Existing cabling reused" : ""}`, last);
       navbar(ws, 3);
       hdr(ws, 6, 1, ["SN", "Activity", "What to do", "Who", "Impact", "After SN", "Dur (min)", "Start", "End", "Remarks"]);
       ws.mergeCells(6, G0, 6, last); put(ws, 6, G0, "🕒 TIME MAPPING (30-min slots from team arrival)", { font: { bold: true, ...WHITEF }, fill: HDR, al: CEN });
@@ -351,18 +386,18 @@
     navbar(cn, 3);
     hdr(cn, 5, 1, ["#", "From", "To", "Cable / type", ...types.map(t => t.name), "Step", "Remarks"]);
     const airDay = ND === 4 ? "2" : `1 / ${CUT}`;
+    const ROLES = [...new Set(types.flatMap(t => unitsOf(t).map(u => u.role || "Radio")))];
     const conn = [
-      [newName, "Low-band radio", "Fiber CPRI + SFP", t => +t.lowQty, "Day 1", "One per radio"],
-      [newName, "Mid-band radio", "Fiber CPRI + SFP", t => +t.midQty, "Day 1", "One per radio"],
-      [newName, "AIR (N78)", "Fiber + SFP", t => +t.airQty, `Day ${airDay}`, "Per design per AIR"],
+      ...ROLES.map(role => [newName, role, "Fiber CPRI + SFP", t => sumQ(unitsOf(t).filter(u => (u.role || "Radio") === role)), /AIR|5G|NR/i.test(role) ? `Day ${airDay}` : "Day 1", "One per unit"]),
       ...OLDB.map(b => [`${b.model} (reused${b.tech ? ", " + b.tech : ""})`, "New radios", "Fiber CPRI + SFP", () => +b.qty, `Day ${CUT} (outage)`, "Re-home during outage"]),
       ...NEWB.map(b => ["Rectifier / PDU", b.model, "DC power + CB", () => +b.qty, "Day 1", ""]),
-      ["Rectifier / PDU", "Radios", "DC power cable + CB", t => +t.lowQty + +t.midQty, "Day 1", ""],
-      ["Rectifier / PDU", "AIRs", "DC power cable + CB", t => +t.airQty, `Day ${airDay}`, ""],
+      ...(state.rbs || []).filter(r => r.type && +r.qty > 0).map(r => ["Rectifier / PDU", r.type, "DC power + CB", () => +r.qty, "Day 1", "New RBS"]),
+      ["Rectifier / PDU", "Radios", "DC power cable + CB", t => sumQ(radiosOf(t)), "Day 1", ""],
+      ["Rectifier / PDU", "AIRs", "DC power cable + CB", t => sumQ(airsOf(t)), `Day ${airDay}`, ""],
       ["Radios", "Existing antennas", "RF jumpers (per port map)", () => "map", `Day ${CUT} (outage)`, "Torque + weatherproof"],
       [newName, "TX / MW / router", "Ethernet / fiber backhaul", () => 1, `Day 1 / ${CUT}`, "New port Day 1, migration on cutover"],
       ["Site alarms", "New / reused basebands", "Alarm cable", () => 1, `Day ${CUT}`, ""],
-      ["All new units", "Site ground bar", "Grounding cable", t => +t.lowQty + +t.midQty + +t.airQty + bbQty(state, "New"), "Day 1", "Radios + AIRs + new basebands"],
+      ["All new units", "Site ground bar", "Grounding cable", t => sumQ(unitsOf(t)) + bbQty(state, "New") + (state.rbs || []).reduce((a, r) => a + (r.type ? +r.qty || 0 : 0), 0), "Day 1", "Radios + AIRs + new basebands + RBS"],
     ];
     conn.forEach(([a, b, c, q, s, rm], i) => {
       const r = 6 + i, z = i % 2 ? "F7F9FC" : null;
@@ -440,7 +475,7 @@
     db.mergeCells(10, 5, 11, 14);
     put(db, 10, 5, fx(`"Outage allowed "&TEXT(${IC.outStart},"hh:mm")&" → "&TEXT(${IC.outStart}+${IC.outMax}/24,"hh:mm")&" (cutover day ${CUT})  •  "&${IC.days}&" days per site  •  24h KPI check remote"`,
       `Outage allowed ${clock(hm(P.outStart))} → ${clock(hm(P.outStart) + P.outMax * 60)} (cutover day ${CUT})  •  ${ND} days per site  •  24h KPI check remote`), { font: { italic: true, bold: true, color: { argb: ARGB(TEAL) } }, al: LFT, border: false });
-    const H = { 1: "Site type", 2: "Radios + AIR", 4: "Sites", 5: "Days" };
+    const H = { 1: "Site type", 2: "Equipment", 4: "Sites", 5: "Days" };
     dayCols.forEach((c, i) => H[c] = `Day ${i + 1}${i + 1 === CUT ? " ⚡" : ""}`);
     Object.assign(H, { [cOut]: "🔴 Outage", [cTot]: "⏱ Total / site", [cSum]: "Σ all sites", [cStat]: "Status", [cWin]: "🔴 Outage window" });
     for (const [c, v] of Object.entries(H)) put(db, H0, +c, v, { font: { bold: true, ...WHITEF }, fill: HDR, al: CEN });
@@ -448,7 +483,7 @@
     types.forEach((t, j) => {
       const r = T0 + j, s = `'${t.name}'!`, n = sites.filter(x => x.type === t.name).length, S = t.sch, K = KP[t.name];
       put(db, r, 1, { text: t.name, hyperlink: `#'${t.name}'!A1` }, { font: { bold: true, underline: true, ...WHITEF }, fill: t.color, al: CEN });
-      db.mergeCells(r, 2, r, 3); put(db, r, 2, `${t.lowQty}x ${t.lowModel} + ${t.midQty}x ${t.midModel} + ${t.airQty}x ${t.airModel}${t.reuseCabling ? " (reuse cabling)" : ""}`, { font: { size: 9 } });
+      db.mergeCells(r, 2, r, 3); put(db, r, 2, `${equipTxt(t)}${t.reuseCabling ? " (reuse cabling)" : ""}`, { font: { size: 9 } });
       put(db, r, 4, fx(`COUNTIF('Site Tracker'!$C$6:$C$${L},"${t.name}")`, n), { font: { bold: true }, al: CEN });
       put(db, r, 5, fx(IC.days, ND), { al: CEN });
       dayCols.forEach((c, i) => put(db, r, c, fx(`${s}${K["d" + (i + 1)]}`, S.days[i].hours / 1440), { al: CEN, fmt: "[h]:mm", font: { bold: i + 1 === CUT } }));
@@ -524,7 +559,7 @@
     doc.autoTable({ startY: y, margin: { left: M0, right: M0 }, styles: { fontSize: 9, cellPadding: 1.8, valign: "middle" },
       headStyles: { fillColor: rgb("2E3B55"), textColor: 255 },
       head: [["Type", "Equipment", "Sites", ...dh, "Outage window", "Status"]],
-      body: types.map(t => [t.name, clean(`${t.lowQty}x ${t.lowModel} + ${t.midQty}x ${t.midModel} + ${t.airQty}x ${t.airModel}`), sites.filter(s => s.type === t.name).length,
+      body: types.map(t => [t.name, clean(equipTxt(t)), sites.filter(s => s.type === t.name).length,
         ...t.sch.days.map(d => `${clock(d.arrive)}-${clock(d.leave)}\n${fmt(d.hours)} h`),
         `${clock(t.sch.outStart)} -> ${clock(t.sch.outEnd)}\n${fmt(t.sch.outage)} h`,
         t.sch.days.some(d => d.hours / 60 > +P.maxHours + 0.001) ? "! day too long" : t.sch.outOk ? "OK" : "! outage over allowed"]),
@@ -543,7 +578,7 @@
       const S = t.sch;
       S.days.forEach((d, di) => {
         doc.addPage();
-        head(`${t.name}  |  Day ${di + 1} of ${ND}${d.cut ? "  –  CUTOVER" : ""}`, clean(`${t.lowQty}x ${t.lowModel} + ${t.midQty}x ${t.midModel} + ${t.airQty}x ${t.airModel}  |  BB: ${bbText(state)}`));
+        head(`${t.name}  |  Day ${di + 1} of ${ND}${d.cut ? "  –  CUTOVER" : ""}`, clean(`${equipTxt(t)}  |  BB: ${bbText(state)}`));
         doc.setFont("helvetica", "bold"); doc.setFontSize(10.5);
         doc.text(clean(d.title.replace(/^\S+\s/, "")), M0, 28);
         doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(74, 88, 104);
@@ -581,6 +616,6 @@
     return doc;
   }
 
-  const api = { buildPdf, leadMin, cutArrive, WEEKEND, sub, bbText, bbNames, finishDate, normalize, daysOf, cutDayOf, DEFAULT_STATE, FIXED, schedule, activities, sitesOf, buildWorkbook, fmt, clock, hm, COLORS };
+  const api = { isAir, equipTxt, unitsOf, buildPdf, leadMin, cutArrive, WEEKEND, sub, bbText, bbNames, finishDate, normalize, daysOf, cutDayOf, DEFAULT_STATE, FIXED, schedule, activities, sitesOf, buildWorkbook, fmt, clock, hm, COLORS };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.MOP = api;
 })(typeof window !== "undefined" ? window : globalThis);

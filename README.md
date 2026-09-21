@@ -57,6 +57,12 @@ Dockerfile, nginx.conf, docker-compose.yml
 
 ## Changelog
 
+**v1.3.0**
+- New RBS / cabinet list (free-text type, qty, minutes) – installed on Day 1 before the baseband
+- Site types are fully editable: add any number of parts (low / mid / high band radio, extra RRU, 5G AIR), write the band freely,
+  set qty and minutes per unit; install and cabling times follow. Parts named AIR / 5G / NR use the 5G AIR steps
+- Older saved setups are converted automatically
+
 **v1.2.0**
 - Cutover-day arrival is automatic: approved outage start minus the pre-outage prep (access, safety, rigging/pre-check, GO/NO-GO) – no idle team
 - New **PDF** button: short, easy-to-read MOP for the field team (key facts, site types at a glance, one page per type and day with a timeline). Full detail stays in Excel

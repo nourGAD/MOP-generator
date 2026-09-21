@@ -107,47 +107,104 @@
     {
       "name": "Type-1",
       "sites": 5,
-      "lowModel": "Radio 4486 B8B20B28",
-      "lowQty": 3,
-      "midModel": "Radio 4490 B1B3",
-      "midQty": 3,
-      "airModel": "AIR 6419 B42",
-      "airQty": 3,
-      "reuseCabling": false
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Low band",
+          "model": "Radio 4486 B8B20B28",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "Mid band",
+          "model": "Radio 4490 B1B3",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "5G AIR",
+          "model": "AIR 6419 B42",
+          "qty": 3,
+          "min": 60
+        }
+      ]
     },
     {
       "name": "Type-2",
       "sites": 14,
-      "lowModel": "Radio 4486 B8B20B28",
-      "lowQty": 3,
-      "midModel": "Radio 4490 B1B3",
-      "midQty": 3,
-      "airModel": "AIR 3219 B42",
-      "airQty": 3,
-      "reuseCabling": false
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Low band",
+          "model": "Radio 4486 B8B20B28",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "Mid band",
+          "model": "Radio 4490 B1B3",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "5G AIR",
+          "model": "AIR 3219 B42",
+          "qty": 3,
+          "min": 45
+        }
+      ]
     },
     {
       "name": "Type-3",
       "sites": 1,
-      "lowModel": "Radio 6646 B8B20B28",
-      "lowQty": 1,
-      "midModel": "Radio 4490 B1B3",
-      "midQty": 3,
-      "airModel": "AIR 3219 B42",
-      "airQty": 3,
-      "reuseCabling": false
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Low band",
+          "model": "Radio 6646 B8B20B28",
+          "qty": 1,
+          "min": 40
+        },
+        {
+          "role": "Mid band",
+          "model": "Radio 4490 B1B3",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "5G AIR",
+          "model": "AIR 3219 B42",
+          "qty": 3,
+          "min": 45
+        }
+      ]
     },
     {
       "name": "Type-4",
       "sites": 5,
-      "lowModel": "Radio 4486 B8B20B28",
-      "lowQty": 3,
-      "midModel": "Radio 4490 B1B3",
-      "midQty": 3,
-      "airModel": "AIR 3255 B78AA",
-      "airQty": 3,
-      "reuseCabling": false
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Low band",
+          "model": "Radio 4486 B8B20B28",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "Mid band",
+          "model": "Radio 4490 B1B3",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "5G AIR",
+          "model": "AIR 3255 B78AA",
+          "qty": 3,
+          "min": 40
+        }
+      ]
     }
   ],
+  "rbs": [],
   "siteList": ""
 }

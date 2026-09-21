@@ -34,6 +34,12 @@
       <label class="f">Regions (comma separated)<input type="text" data-p="regions" placeholder="e.g. North, South"></label>
     </div>
   </div></details>
+  <details class="sec" open><summary>New RBS / cabinet</summary><div class="body">
+    <p class="hint">New RBS or cabinet installed on Day 1 with the baseband (before it). Type is free text.</p>
+    <div class="uh rbh"><span>RBS type</span><span>Qty</span><span>Min/unit</span><span></span></div>
+    <div id="rbsList"></div>
+    <button class="add" id="addRBS">Add RBS</button>
+  </div></details>
   <details class="sec" open><summary>Basebands</summary><div class="body">
     <p class="hint">Add every baseband on site. <b>New</b> ones are installed on Day 1; <b>Reused</b> ones are re-homed to the new radios during the outage.</p>
     <div id="bbs"></div>
@@ -55,7 +61,9 @@
     </div>
   </div></details>
   <details class="sec" open><summary>Site types &amp; equipment</summary><div class="body">
-    <p class="hint">One card per equipment set. Durations on the tower follow the quantities and models.</p>
+    <p class="hint">One card per equipment set. Add any part (low / mid band radio, extra RRU, 5G AIR) and write its band freely – install and cabling time follow quantity × minutes. Parts named AIR / 5G / NR are handled with the 5G AIR steps.</p>
+    <datalist id="roles"><option value="Low band"><option value="Mid band"><option value="High band"><option value="5G AIR"><option value="Extra RRU"></datalist>
+    <datalist id="models"></datalist>
     <div id="types"></div>
     <button class="add" id="addType">Add site type</button>
   </div></details>
