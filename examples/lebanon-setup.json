@@ -128,6 +128,8 @@
     {
       "name": "Type-1",
       "sites": 5,
+      "towerType": "Monopole",
+      "towerHeight": 30,
       "reuseCabling": false,
       "units": [
         {
@@ -182,6 +184,8 @@
           "min": 45
         }
       ],
+      "towerType": "Monopole",
+      "towerHeight": 30,
       "scenario": "swap",
       "days": 2,
       "edits": {
@@ -215,6 +219,8 @@
           "min": 45
         }
       ],
+      "towerType": "Monopole",
+      "towerHeight": 30,
       "scenario": "swap",
       "days": 2,
       "edits": {
@@ -248,6 +254,8 @@
           "min": 40
         }
       ],
+      "towerType": "Monopole",
+      "towerHeight": 30,
       "scenario": "swap",
       "days": 2,
       "edits": {

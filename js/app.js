@@ -44,10 +44,13 @@ function renderInputs(){
     <div class="head"><label class="f">Name<input type="text" data-t="name" value="${esc(t.name)}"></label>
       <label class="f">${TRMm()?"Links":"Sites"}<input type="number" min="0" data-t="sites" value="${t.sites}"></label>
       <button class="x" data-del="${i}" aria-label="Remove ${esc(t.name)}" title="Remove">×</button></div>
+    ${!TRMm()?`<div class="twr"><label class="f">Tower type<input type="text" list="towerTypes" data-t="towerType" value="${esc(t.towerType||'Monopole')}" placeholder="GF / Rooftop / Monopole / Lattice"></label>
+      <label class="f">Height&nbsp;(m)<input type="number" min="5" max="300" step="5" data-t="towerHeight" data-num="1" value="${+t.towerHeight||30}"></label></div>
+    <p class="hint sm twr-h">× cable: ${(M.cabF&&M.cabF(+t.towerHeight||30)||1).toFixed(2)} · × install: ${(M.towF&&M.towF(+t.towerHeight||30)||1).toFixed(2)} · × rigging: ${(M.rigF&&M.rigF(+t.towerHeight||30)||1).toFixed(2)} at ${+t.towerHeight||30}m</p>`:""}
     ${!TRMm()?`<div class="opts two"><label class="f">MOP type<select data-t="scenario">${Object.entries(M.RAN_SCEN).map(([k,v])=>`<option value="${k}" ${t.scenario===k?"selected":""}>${esc(v.label)}</option>`).join("")}</select></label>
       <label class="f">Days<select data-t="days" data-num="1">${(M.RAN_SCEN[t.scenario]||M.RAN_SCEN.swap).days.map(d=>`<option value="${d}" ${+t.days===d?"selected":""}>${d} day${d>1?"s":""}</option>`).join("")}</select></label></div>`:""}
     ${TRMm()?`<div class="opts"><label class="f">Swap method<select data-t="method">${Object.entries(M.TRM_METHODS).map(([k,v])=>`<option value="${k}" ${t.method===k?"selected":""}>${esc(v.label)}</option>`).join("")}</select></label>
-      ${t.method==="normal"||t.method==="new"?`<label class="chk"><input type="checkbox" data-t="compact" ${t.compact?"checked":""}> Install both ends on Day 1 (small antennas)</label>`:""}
+      ${["normal","new","radswap"].includes(t.method)?`<label class="chk"><input type="checkbox" data-t="compact" ${t.compact?"checked":""}> Install both ends on Day 1 (small antennas)</label>`:""}
       <label class="chk"><input type="checkbox" data-t="sd" ${t.sd?"checked":""}> Space diversity (SD) – adds Main-Div alignment</label></div>`:""}
     <div class="uh"><span>${TRMm()?"Part · model (per link end)":"Part / band · model"}</span><span>Qty</span><span>Min/unit</span><span></span></div>
     ${(t.units||[]).map((u,k)=>`<div class="un" data-u="${k}">
@@ -125,9 +128,13 @@ function render(){
         ${d.cut&&!r.noOutage?'<label class="ao"><input type="checkbox" class="aoc"> outage</label>':""}
         <button class="add sm ab" data-addday="${di+1}">Add</button></div>
     </div>`};
-  const rem=M.removedSteps(S,t);
+  const rem=M.removedSteps(S,t), bgrps=nd>1?M.listBalanceGroups(S,t):[];
+  const balOpts=t.balGroups||(t.balGroups=Object.fromEntries(bgrps.map(g=>[g.key,true])));
+  bgrps.forEach(g=>{if(balOpts[g.key]===undefined)balOpts[g.key]=true;});
+  const balHtml=bgrps.length?`<div class="bgopts">${bgrps.map(g=>`<label><input type="checkbox" class="bg" data-gk="${g.key}" ${balOpts[g.key]?"checked":""}> ${g.label} (Day ${g.origDay}→${g.allow.join("/")})</label>`).join("")}</div>`:"";
   $("#tl").innerHTML=`<div class="tlhead"><h2>${esc(t.name)} — ${r.days.length} day${r.days.length>1?"s":""} ${TRMm()?"per link":"on site"}</h2>
-      <div class="tlbtn">${nd>1?'<button class="ghost2" id="bal" title="Move flexible blocks (QA, finishing, AIR, decommissioning) to even out the days">⚖ Auto-balance days</button>':""}<button class="ghost2" id="rst" title="Undo all step edits for this type">↺ Reset steps</button></div></div>
+      <div class="tlbtn">${nd>1?`<span class="balwrap"><button class="ghost2" id="bal" title="Move flexible blocks to even out the days">⚖ Balance</button>${balHtml}</span>`:""}
+      <button class="ghost2" id="rst" title="Undo all step edits for this type">↺ Reset steps</button></div></div>
     <div class="sub">${r.noOutage?`<b style="color:var(--green)">No outage for this MOP type</b>`:`Outage on Day ${r.cutIdx}: ${M.clock(r.outStart)} → ${M.clock(r.outEnd)} (${M.fmt(r.outage)}) · allowed ${M.clock(r.outApproved)} → ${M.clock(r.allowedEnd)} <b style="color:${r.outOk?"var(--green)":"var(--red)"}">${r.outOk?"✔ within window":"⚠ exceeds window"}</b>`} · Total ${M.fmt(r.total)} on site${t.reuseCabling?" · cable runs skipped (reused)":""}</div>
     <div class="legend"><span style="--k:var(--amber)">${TRMm()?"Riggers":"Tower crew"}</span><span style="--k:var(--blue)">${TRMm()?"Team lead / FE":"Ground / FE"}</span><span style="--k:var(--violet)">Remote integrator</span><span style="--k:var(--red)">Outage</span><span style="--k:rgba(47,158,68,.35)">Allowed outage window</span></div>
     <p class="hint">Edit any step: move it to another day (D1…), change its minutes, remove it (×) or add your own step at the end of a day. Moved / added steps run after the same crew's last step of that day.</p>
@@ -154,6 +161,9 @@ document.addEventListener("input",e=>{
     if(el.dataset.uk==="role"||el.dataset.uk==="model"){const ki=el.closest(".un").querySelector(".kind"), k2=kindOf(u); ki.textContent=k2.txt; ki.className="kind "+k2.cls} }
   else if(el.dataset.rb){const i=+el.closest(".rb").dataset.r; S.rbs[i][el.dataset.rb]=v}
   else if(el.dataset.t){const i=+el.closest(".tcard").dataset.i, tt=S.types[i]; tt[el.dataset.t]=v;
+    if(["towerType","towerHeight"].includes(el.dataset.t)){
+      const ci=+el.closest(".tcard").dataset.i; S.types[ci][el.dataset.t]=el.dataset.num?+el.value:el.value;
+      renderInputs();render();updCut();return}
     if(["method","scenario","days","compact"].includes(el.dataset.t)){ if(el.dataset.t==="scenario"){tt.days=M.RAN_SCEN[v].def} tt.edits={rm:{},mv:{},dur:{},add:[]}; sel=i; renderInputs(); if(el.dataset.t!=="days"&&el.dataset.t!=="compact") toast("Template changed – step edits for this type were reset."); } updCut()}
   else if(el.dataset.k){const i=+el.closest(".eq").dataset.e, old=S.equipment[i].model; S.equipment[i][el.dataset.k]=v;
     if(el.dataset.k==="model") S.types.forEach(t=>(t.units||[]).forEach(u=>{if(u.model===old)u.model=v}));
@@ -165,6 +175,7 @@ function curT(){return S.types[sel]}
 function edits(t){t.edits=t.edits||{};["rm","mv","dur"].forEach(k=>t.edits[k]=t.edits[k]||{});t.edits.add=t.edits.add||[];return t.edits}
 document.addEventListener("change",e=>{
   const el=e.target, t=curT(); if(!t) return;
+  if(el.classList.contains("bg")&&t){if(!t.balGroups)t.balGroups={};t.balGroups[el.dataset.gk]=el.checked;return}
   if(el.dataset.mv){const id=el.dataset.mv, E=edits(t), to=+el.value;
     if(id.startsWith("c:")){const c=E.add.find(x=>"c:"+x.id===id); if(c) c.day=to;}
     else { const orig=+id.split(":")[0]; if(to===orig) delete E.mv[id]; else E.mv[id]=to; }
@@ -182,7 +193,10 @@ document.addEventListener("click",e=>{
   if(b.dataset.addday&&t0){const row=b.closest(".addrow"), nm=row.querySelector(".an").value.trim(); if(!nm){toast("Type a step name first.");return}
     const E=edits(t0); E.add.push({id:Date.now().toString(36),name:nm,who:row.querySelector(".aw2").value,dur:+row.querySelector(".am").value||0,day:+b.dataset.addday,after:row.querySelector(".aa").value,outage:!!(row.querySelector(".aoc")&&row.querySelector(".aoc").checked)});
     render(); toast(`Step added to Day ${b.dataset.addday}.`); return}
-  if(b.id==="bal"&&t0){const before=M.schedule(S,t0).days.map(d=>M.fmt(d.hours)).join(" / "); t0.edits=M.autoBalance(S,t0); const after=M.schedule(S,t0).days.map(d=>M.fmt(d.hours)).join(" / "); render(); toast(before===after?"Days are already as balanced as the flexible blocks allow.":`Balanced: ${before} → ${after}`); return}
+  if(b.id==="bal"&&t0){const before=M.schedule(S,t0).days.map(d=>M.fmt(d.hours)).join(" / ");
+    const sel=new Set(document.querySelectorAll(".bg:checked").map?Array.from(document.querySelectorAll(".bg:checked")).map(c=>c.dataset.gk):[...document.querySelectorAll(".bg:checked")].map(c=>c.dataset.gk));
+    t0.edits=M.autoBalanceGroups?M.autoBalanceGroups(S,t0,sel.size?sel:undefined):M.autoBalance(S,t0);
+    const after=M.schedule(S,t0).days.map(d=>M.fmt(d.hours)).join(" / "); render(); toast(before===after?"Already balanced – try enabling more groups.":`Balanced: ${before} → ${after}`); return}
   if(b.id==="rst"&&t0){t0.edits={rm:{},mv:{},dur:{},add:[]}; render(); toast("Steps reset to the template."); return}
   if(b.dataset.mode&&b.closest(".seg,.start")){ $("#start").hidden=true; if(b.dataset.mode!==ALL.mode) switchMode(b.dataset.mode); else save(); return }
   if(b.dataset.sel!==undefined){sel=+b.dataset.sel;render()}

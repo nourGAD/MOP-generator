@@ -260,6 +260,56 @@
       }
     },
     {
+      "name": "SC-6 Radio swap",
+      "sites": 3,
+      "method": "radswap",
+      "compact": false,
+      "sd": false,
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Radio",
+          "model": "RAU 6363",
+          "qty": 2,
+          "min": 15
+        }
+      ],
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
+    },
+    {
+      "name": "SC-7 Dismantle",
+      "sites": 2,
+      "method": "dism",
+      "compact": false,
+      "sd": false,
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Antenna",
+          "model": "Antenna 0.9m HPX",
+          "qty": 1,
+          "min": 60
+        },
+        {
+          "role": "Radio",
+          "model": "RAU 6363",
+          "qty": 2,
+          "min": 15
+        }
+      ],
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
+    },
+    {
       "name": "SC-8 IDU / NPU swap",
       "sites": 4,
       "method": "idu",

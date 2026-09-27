@@ -44,7 +44,7 @@
     fixed: Object.fromEntries(FIXED.concat(RAN_EXTRA_LIST).map(f => [f[0], f[2]])),
     d0: D0_DEFAULT_TXT,
     types: [
-      { name: "Type-1", sites: 5, reuseCabling: false, units: [
+      { name: "Type-1", sites: 5, towerType: "Monopole", towerHeight: 30, reuseCabling: false, units: [
         { role: "Low band", model: "Radio 4486 B8B20B28", qty: 3, min: 20 },
         { role: "Mid band", model: "Radio 4490 B1B3", qty: 3, min: 20 },
         { role: "5G AIR", model: "AIR 6419 B42", qty: 3, min: 60 } ] },
@@ -64,6 +64,11 @@
     rbs: [],
     siteList: "",
   });
+
+  // Tower-height factors
+  const cabF = h => { h=+h||30; return h<=30?1.0:h<=45?1.3:h<=60?1.6:h<=90?2.0:2.5; };
+  const towF = h => { h=+h||30; return h<=30?1.0:h<=60?1.2:h<=90?1.5:1.8; };
+  const rigF = h => { h=+h||30; return h<=30?1.0:h<=45?1.2:h<=60?1.4:h<=90?1.7:2.1; };
 
   // a unit is handled as a 5G AIR (installed/cabled with the AIR steps) when its role or model says so
   const isAir = u => /\b(AIR|5G|NR|AAS|mMIMO)\b/i.test(`${u.role || ""} ${u.model || ""}`);
@@ -105,7 +110,7 @@
       return { name: t.name, sites: t.sites, reuseCabling: !!t.reuseCabling, units: u };
     });
     if (!Array.isArray(s.rbs)) s.rbs = [];
-    s.types.forEach(t => { if (!RAN_SCEN[t.scenario]) t.scenario = "swap"; if (!RAN_SCEN[t.scenario].days.includes(+t.days)) t.days = t.scenario === "swap" && [2, 3, 4].includes(+s.project.daysPerSite) ? +s.project.daysPerSite : RAN_SCEN[t.scenario].def;
+    s.types.forEach(t => { if (!t.towerType) t.towerType="Monopole"; if (!t.towerHeight) t.towerHeight=30; if (!RAN_SCEN[t.scenario]) t.scenario = "swap"; if (!RAN_SCEN[t.scenario].days.includes(+t.days)) t.days = t.scenario === "swap" && [2, 3, 4].includes(+s.project.daysPerSite) ? +s.project.daysPerSite : RAN_SCEN[t.scenario].def;
       if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, add: [] }; });
     return s;
   }
@@ -155,7 +160,8 @@
     const RAD = radiosOf(t), AIRS = airsOf(t);
     const nr = sumQ(RAD), na = sumQ(AIRS);
     const radTxt = listTxt(RAD, true) || "radios";
-    const radMin = sumMin(RAD), airMin = sumMin(AIRS);
+    const _h = +t.towerHeight||30, _cf = cabF(_h), _tf = towF(_h), _rf = rigF(_h);
+    const radMin = Math.round(sumMin(RAD)*_tf), airMin = Math.round(sumMin(AIRS)*_tf);
     const reuse = !!t.reuseCabling, heavy = AIRS.some(u => /6419|64T/.test(u.model));
     const RBS = (state.rbs || []).filter(r => r.type && +r.qty > 0);
     const newN = bbQty(state, "New"), oldN = bbQty(state, "Reused");
@@ -174,7 +180,7 @@
     ];
     const airInstall = after => A("airs", "Install 5G AIRs", na ? `Install ${listTxt(AIRS, true)} with brackets; set azimuth & tilt per RND` : "No 5G AIR in this site type", "Tower crew", airMin, [after], "",
       !na ? "SKIPPED – no 5G AIR" : heavy ? "Heavy AIR: hoist + structural approval" : "");
-    const airCab = (after, rem) => A("airCab", "AIR cabling", `Run & fix DC + fiber for ${na} AIRs to ${NEW}; ground kits; weatherproof; labels`, "Tower crew", reuse ? 0 : na * U.cableAIR, after, "",
+    const airCab = (after, rem) => A("airCab", "AIR cabling", `Run & fix DC + fiber for ${na} AIRs to ${NEW}; ground kits; weatherproof; labels`, "Tower crew", reuse ? 0 : Math.round(na * U.cableAIR * _cf), after, "",
       reuse ? "SKIPPED – existing cabling reused" : rem);
     const rbsActs = RBS.map((r, i) => A("rbs" + i, `Install ${r.type}`, `Install ${r.qty}x ${r.type} (RBS / cabinet) on plinth or wall; grounding, DC feed, cable entry`, "Ground tech",
       (+r.qty || 0) * (+r.min || 0), [i ? "rbs" + (i - 1) : "material"], "", "New RBS – before baseband installation"));
@@ -187,11 +193,11 @@
     ];
     // ---- Day 1 (installation)
     const d1 = start1();
-    d1.push(A("rig", "Rigging", "Pulley, ropes, rescue kit, exclusion zone", "Tower crew", F.rigging1, ["material"]));
+    d1.push(A("rig", "Rigging", "Pulley, ropes, rescue kit, exclusion zone", "Tower crew", Math.round((F.rigging1||30)*_rf), ["material"]));
     d1.push(A("radios", "Install radios", `Install ${radTxt} with brackets & grounding next to old RRUs`, "Tower crew", radMin, ["rig"], "", "Old RRUs stay in service"));
     let lastTower = "radios";
     if (D !== 4) { d1.push(airInstall("radios")); lastTower = "airs"; }
-    d1.push(A("radCab", "Radio cabling", `Run & fix DC + fiber for ${nr} radios to ${NEW}; ground kits; weatherproof; labels`, "Tower crew", reuse ? 0 : nr * U.cableRadio, [lastTower], "",
+    d1.push(A("radCab", "Radio cabling", `Run & fix DC + fiber for ${nr} radios to ${NEW}; ground kits; weatherproof; labels`, "Tower crew", reuse ? 0 : Math.round(nr * U.cableRadio * _cf), [lastTower], "",
       reuse ? "SKIPPED – existing cabling reused" : "⭐ PRIORITY – needed for cutover. AIR cabling can run in parallel (same route, install once). Skip if existing cabling is reused"));
     d1.push(...bbTrack());
     d1.push(A("powRad", "Power up radios", `Connect radio DC & fiber at ${NEW} side, power up, no HW alarms. Cells LOCKED`, "FE + Ground tech", F.powerRadios, ["radCab", "tn"], "", "Never unlock before jumpers connected"));
@@ -200,7 +206,7 @@
     // ---- Day 2 for 4-day plan: AIRs
     if (D === 4) {
       const d = startN("");
-      d.push(A("rig", "Rigging", "Rope & pulley for AIR hoisting", "Tower crew", F.riggingN, ["safety"]));
+      d.push(A("rig", "Rigging", "Rope & pulley for AIR hoisting", "Tower crew", Math.round((F.riggingN||15)*_rf), ["safety"]));
       d.push(airInstall("rig"));
       d.push(airCab(["airs"], "Install once – same route as radio cabling"));
       d.push(A("powAir", "Power up AIRs", `Connect AIR DC & fiber at ${NEW}, power up, no HW alarms`, "Ground tech", F.powerAir, ["airCab"]));
@@ -212,7 +218,7 @@
     // ---- Cutover day
     const finishHere = D === 2;
     const c = startN("; confirm approved outage window");
-    c.push(A("rig", "Rigging", "Rope & pulley ready for jumper swap" + (D !== 4 ? " + AIR cabling" : ""), "Tower crew", F.riggingN, ["safety"]));
+    c.push(A("rig", "Rigging", "Rope & pulley ready for jumper swap" + (D !== 4 ? " + AIR cabling" : ""), "Tower crew", Math.round((F.riggingN||15)*_rf), ["safety"]));
     c.push(A("precut", "Pre-cutover check", "Alarm/KPI snapshot & old config backup (remote); FE test calls on site", "Remote integrator + FE", F.precut, ["safety"], "", "Remote, parallel with field"));
     c.push(A("gng", "GO / NO-GO", "Previous-day work OK, integrator & NOC online; approval to start outage", "Team lead + Remote integrator", F.gng, ["rig", "precut"], "", "Any issue = postpone"));
     c.push(A("off", "Power off old equipment", "Lock cells (remote), power off old RRUs & old baseband (site)", "Remote integrator + FE", F.powerOff, ["gng"], "Outage",
@@ -279,6 +285,7 @@
     if (sc === "swap") return activities(state, t, D);
     const F = state.fixed, U = state.unit;
     const RAD = radiosOf(t), AIRS = airsOf(t), nr = sumQ(RAD), na = sumQ(AIRS), reuse = !!t.reuseCabling;
+    const _h2 = +t.towerHeight||30, _cf2 = cabF(_h2), _tf2 = towF(_h2), _rf2 = rigF(_h2);
     const newN = bbQty(state, "New"), NEW = bbNames(state, "New") || "new baseband";
     const RBS = (state.rbs || []).filter(r => r.type && +r.qty > 0);
     const A = (key, name, desc, who, dur, after, impact, rem, extra) => Object.assign({ key, name, desc, who, dur: Math.max(0, Math.round(+dur || 0)), after: after || [], impact: impact || "Non-SA", rem: rem || "" }, extra || {});
@@ -307,11 +314,11 @@
     const tower = (L, after, withRadios, withAirs) => {
       L.push(A("pre", "Pre-assembly & cable prep", "Assemble units on ground, sector labels; lay out power cable; label fiber (no kinks)", "Tower crew + " + GT, F.preAsm, [after]));
       L.push(A("conn", "Prepare DC / fiber connectors", "Prepare DC power connectors (TL checks)", GT, F.connPrep, ["pre"]));
-      L.push(A("rig", "Rigging", "Tower climbing, rope lifting, lifting rig & rescue kit", TW, F.riggingN || 15, ["pre"]));
+      L.push(A("rig", "Rigging", "Tower climbing, rope lifting, lifting rig & rescue kit", TW, Math.round((F.riggingN||15)*_rf2), ["pre"]));
       let last = "rig";
-      if (withRadios && nr) { L.push(A("radios", "Install radios", `Install ${listTxt(RAD, true)}; ground, jumpers, RET`, TW, sumMin(RAD), [last])); last = "radios"; }
-      if (withAirs && na) { L.push(A("airs", "Install 5G AIRs", `Install ${listTxt(AIRS, true)}; azimuth / tilt per RND`, TW, sumMin(AIRS), [last])); last = "airs"; }
-      L.push(A("cab", "Cables installation", "Fiber & power from units to cabinet inlet; connect fiber on BB and power on CB", TW, reuse ? 0 : nr * U.cableRadio + na * U.cableAIR, [last, "conn"], "", reuse ? "SKIPPED – existing cabling reused" : ""));
+      if (withRadios && nr) { L.push(A("radios", "Install radios", `Install ${listTxt(RAD, true)}; ground, jumpers, RET`, TW, Math.round(sumMin(RAD)*_tf2), [last])); last = "radios"; }
+      if (withAirs && na) { L.push(A("airs", "Install 5G AIRs", `Install ${listTxt(AIRS, true)}; azimuth / tilt per RND`, TW, Math.round(sumMin(AIRS)*_tf2), [last])); last = "airs"; }
+      L.push(A("cab", "Cables installation", `Fiber & power${_h2>30?" ("+_h2+"m ×"+_cf2.toFixed(1)+")":""}`, TW, reuse ? 0 : Math.round((nr * U.cableRadio + na * U.cableAIR)*_cf2), [last, "conn"], "", reuse ? "SKIPPED – existing cabling reused" : ""));
       return "cab";
     };
     const qa = (L, after, siteClose, allow) => {
@@ -355,8 +362,8 @@
       const d1 = start(true); const bb = bbTrack(d1, "material"); const tw = tower(d1, "material", true, D === 2);
       endDay(d1, [tw, bb], false); days.push({ title: "🏗 DAY 1 – NEW SITE: ENCLOSURE, BB & HARDWARE", acts: d1 });
       const d2 = start(false);
-      if (D === 3 && na) { d2.push(A("rig2", "Rigging", "Tower climbing & rescue kit", TW, F.riggingN || 15, ["ehs"]));
-        d2.push(A("airs", "Install 5G AIRs", `Install ${listTxt(AIRS, true)}`, TW, sumMin(AIRS), ["rig2"])); }
+      if (D === 3 && na) { d2.push(A("rig2", "Rigging", "Tower climbing & rescue kit", TW, Math.round((F.riggingN||15)*_rf2), ["ehs"]));
+        d2.push(A("airs", "Install 5G AIRs", `Install ${listTxt(AIRS, true)}`, TW, Math.round(sumMin(AIRS)*_tf2), ["rig2"])); }
       d2.push(A("int", "Site integration", "Integrator integrates all technologies", RI, F.integ, ["ehs"], "", "🛰 Remote"));
       d2.push(A("alarm", "Alarm check", "Site diagnostics: alarms & status", RI, F.alarmChk, ["int"]));
       d2.push(A("srs", "SRS testing", "SRS test – sectors & technologies working", "Team lead", F.srs, ["alarm"]));
@@ -412,7 +419,10 @@
       const after = c.after && target.acts.some(a => a.key === c.after) ? [c.after] : crewAnchor(target, { who: c.who || "All" });
       const a = { key: "c_" + (c.id || j), id: "c:" + (c.id || j), name: c.name || "New step", desc: c.desc || "", who: c.who || "All", dur: Math.max(0, Math.round(+c.dur || 0)),
         after, impact: c.outage && target.cut ? "Outage" : "Non-SA", rem: "Added step", custom: true, cid: c.id || j };
-      insertBeforeLast(target, a); tailInto(target, a);
+      const _aPos=c.after?target.acts.findIndex(x=>x.key===c.after):-1;
+      if(_aPos>=0)target.acts.splice(Math.min(_aPos+1,Math.max(0,target.acts.length-1)),0,a);
+      else insertBeforeLast(target,a);
+      tailInto(target,a);
     });
     return days;
   }
@@ -481,6 +491,8 @@
     hot: { label: "Hot swap (2 teams, both ends)", days: 3 },
     upg: { label: "1+0 → 2+0 upgrade (add radio)", days: 3 },
     idu: { label: "IDU / NPU swap only", days: 2 },
+    radswap: { label: "Outdoor radio swap only (1 h outage)", days: 2 },
+    dism: { label: "Dismantling only (no outage)", days: 1 },
   };
   const trmCat = u => /\b(ant|antenna|dish|hpx?|vhlp|sb\d)/i.test(`${u.role} ${u.model}`) ? "ant"
     : /\b(idu|npu|mmu|optix|odf)\b|ml ?66\d\d|669\d/i.test(`${u.role} ${u.model}`) ? "idu" : "rad";
@@ -506,6 +518,8 @@
       { name: "SC-5 1.2m + SD + IDU", sites: 3, method: "normal", compact: false, sd: true, reuseCabling: false, units: [
         { role: "Antenna main", model: "Antenna 1.2m HPX", qty: 1, min: 75 }, { role: "Antenna SD", model: "Antenna 1.2m HPX", qty: 1, min: 75 },
         { role: "Radio", model: "RAU 6365", qty: 2, min: 15 }, { role: "IDU", model: "ML 6691 IDU", qty: 1, min: 30 }] },
+      { name: "SC-6 Radio swap", sites: 3, method: "radswap", compact: false, sd: false, reuseCabling: false, units: [{ role: "Radio", model: "RAU 6363", qty: 2, min: 15 }] },
+      { name: "SC-7 Dismantle", sites: 2, method: "dism", compact: false, sd: false, reuseCabling: false, units: [{ role: "Antenna", model: "Antenna 0.9m HPX", qty: 1, min: 60 }, { role: "Radio", model: "RAU 6363", qty: 2, min: 15 }] },
       { name: "SC-8 IDU / NPU swap", sites: 4, method: "idu", compact: false, sd: false, reuseCabling: false, units: [
         { role: "IDU", model: "ML 6691 IDU", qty: 1, min: 30 }] },
     ],
@@ -706,7 +720,7 @@
       c.push(A("lv", "Confirm with NOC & leave", "NOC confirms all up; leave site", "All", F.leave, ["lrf", "pm"]));
       days.push({ title: "⚡ DAY 2 – SITE B + LINK UPGRADE 1+0 → 2+0", acts: c, cut: true });
       days.push({ title: "✅ DAY 3 – QA, VSS / VCOP SESSIONS", acts: qaDay(false) });
-    } else {
+    } else if (m === "idu") {
       const c = start("c", false, true);
       c.push(A("rfi", "RFI check", "Check RFI as per scope & design", TL, F.rfi, ["cehs"]));
       c.push(A("pre", "Pre-check & outage plan", "Pre-check screenshots; share outage plan with expected migration time", FE, F.precheck, ["cehs"]));
@@ -728,6 +742,52 @@
       c.push(A("lv", "Confirm with NOC & leave", "NOC confirms all up; leave site", "All", F.leave, ["lrf", "pm"]));
       days.push({ title: "⚡ DAY 1 – PREPARATION & IDU / NPU SWAP", acts: c, cut: true });
       days.push({ title: "✅ DAY 2 – QA, VSS / VCOP SESSIONS", acts: qaDay(false) });
+    } else if (m === "radswap") {
+      if (!t.compact) {
+        const L = start("a", false, true);
+        L.push(A("arfi","RFI check","Check RFI; confirm new radio bracket position",TL,F.rfi,["aehs"]));
+        L.push(A("aasm","Assemble new radio",`Assemble ${listTxt(RAD,false)||"new radio"} on ground`,RG,F.assemble/2,["arfi"]));
+        L.push(A("arig","Rigging","Tower climbing & rope prep",RG,F.rigging,["aasm"]));
+        L.push(A("arad","Install new radio",`Hoist & install ${listTxt(RAD,true)} on new bracket (old radio stays active)`,RG,radMin,["arig"],"","Do NOT connect IF yet – old link stays active"));
+        L.push(A("acab","Route new IF cable","Route new IF cable from IDU to new radio; do NOT connect yet",RG,Math.round(cab/2),["arad"]));
+        L.push(A("acfg","Pre-configure new radio","Configure with approved LB (Tx off)",FE,F.cfg,["arad"]));
+        L.push(A("aout","Logout with NOC","Confirm status; both ends ready for swap","All",F.logout,["acab","acfg"]));
+        days.push({ title: "🔧 DAY 1 – RADIO PRE-INSTALLATION, BOTH ENDS (no impact)", acts: L });
+      }
+      const c2 = start("c", !t.compact, !t.compact ? false : true);
+      if (t.compact) {
+        c2.push(A("crfi","RFI check","Check RFI; confirm bracket position",TL,F.rfi,["cehs"]));
+        c2.push(A("casm","Assemble & install new radio",`Install ${listTxt(RAD,true)} (old radio stays active)`,RG,F.assemble/2+radMin,["crfi"]));
+        c2.push(A("ccab","Route new IF cable","Route new IF cable; do NOT connect yet",RG,Math.round(cab/2),["casm"]));
+        c2.push(A("ccfg","Pre-configure new radio","Configure with approved LB (Tx off)",FE,F.cfg,["casm"]));
+      }
+      c2.push(A("bk","Backup & pre-check","Save TN backup, report, print screens; confirm new radio ready both ends",FE,F.backup,t.compact?["ccfg","ccab"]:["cehs"]));
+      c2.push(A("gng","GO / NO-GO","New radio installed and pre-configured at both ends; NOC online",TL,F.gng,["bk"]));
+      c2.push(A("noc","NOC confirms outage start","Call NOC – max 1-hour outage",TL,F.nocStart,["gng"],"Outage","🔴 OUTAGE STARTS – max 1 hour",{atOutage:true}));
+      c2.push(A("conn","Connect IF to new radio","Disconnect IF from old radio → connect to new radio (both ends in parallel if 2 teams)",RG,F.connRad,["noc"],"Outage"));
+      c2.push(A("cfg2","Restore configuration","Unlock new radio; restore config and IP parameters",FE,F.cfg,["conn"],"Outage"));
+      c2.push(A("lnk","Link recovery","Confirm link RSL & XPI OK; traffic restored on assigned ports",INT+" + FE",Math.round(F.traffic/3),["cfg2"],"Outage"));
+      c2.push(A("up","NOC confirms all sites up","Link and all local + dependent sites up","NOC + "+TL,F.confirmUp,["lnk"],"Outage","🟢 OUTAGE ENDS – rollback: reconnect IF to old radio"));
+      c2.push(A("dold","Remove old radio","Disconnect and lower old radio; pack for return",RG,F.discDish,["up"]));
+      c2.push(A("bka","Backup after swap","Save backup; compare RSL with pre-swap",FE,F.backupAfter,["up"]));
+      c2.push(A("lrf","LRF / RMM fingerprint","Share license request file",FE,F.lrf,["up"]));
+      c2.push(A("pm","Clear PM logs","Clear PM logs for 24h approval",FE,F.clearPm,["bka"]));
+      c2.push(A("lv","Confirm with NOC & leave","NOC confirms all up; leave site","All",F.leave,["dold","pm","lrf"]));
+      days.push({ title: `⚡ DAY ${days.length+1} – OUTDOOR RADIO SWAP (1 h outage)`, acts: c2, cut: true });
+      days.push({ title: `✅ DAY ${days.length+1} – QA, VSS / VCOP SESSIONS`, acts: qaDay(false) });
+    } else if (m === "dism") {
+      const L2 = start("a", true, true);
+      L2.push(A("adoc","Documentation check","Confirm link decommissioned; final print screens before dismantling",FE,F.precheck,["aehs"]));
+      L2.push(A("arig","Rigging","Tower climbing & rope prep; inform NOC",RG,F.rigging,["adoc"]));
+      if (hasAnt) L2.push(A("aant","Lower antenna / dish",`Lower ${listTxt(ANT,true)}; keep IF cables on tower until radios removed`,RG,antMin,["arig"]));
+      if (nRad) L2.push(A("arad","Lower radios",`Disconnect IF and power, lower ${listTxt(RAD,true)}; coil neatly`,RG,radMin,[hasAnt?"aant":"arig"]));
+      if (iduN) L2.push(A("aidu","Remove old IDU / MMU",`Remove ${listTxt(IDU,false)} from cabinet`,FE,F.decomIdu,["aehs"]));
+      L2.push(A("acab","Remove old cables","Coil and lower old IF / power cables from tower; label and bag",RG,cab,[nRad?"arad":hasAnt?"aant":"arig"]));
+      L2.push(A("apole","Remove old MW pole","Unbolt and lower old MW pole / standoff",RG,Math.max(30,F.dism-antMin-radMin),["acab"]));
+      L2.push(A("apack","Pack dismantled material","Pack all hardware; prepare return note with serials; take overview photos","All",F.pack,["apole",iduN?"aidu":"aehs"]));
+      L2.push(A("avss","Final photos & VSS / VCOP","Upload QA & dismantling photos; submit to RSC",FE,F.vss,["apack"]));
+      L2.push(A("aout","Confirm with NOC & leave","Confirm site cleared; close PTW; inform NOC","All",F.leave,["avss"]));
+      days.push({ title: "🏗 DAY 1 – DISMANTLING, BOTH ENDS (no outage, ~3 h per end)", acts: L2 });
     }
     return raw ? days : finalize(state, t, days);
   }
@@ -822,7 +882,7 @@
     types.forEach((t, ti) => {
       const ws = tws[ti], last = G0 + NS - 1, S = t.sch;
       banner(ws, `MOP ${t.name}  |  ${equipTxt(t)}`,
-        TRM ? `${(TRM_METHODS[t.method] || TRM_METHODS.normal).label}${t.compact && t.method === "normal" ? " – both ends on Day 1" : ""}${t.sd ? "   •   Space diversity" : ""}   •   Links: ${t.sites}   •   ${t.sch.days.length} days per link   •   Qty per link end   •   Blue = edit   •   Outage start & allowed hours on Dashboard` : `BB: ${bbText(state)}${(state.rbs || []).filter(r => r.type && +r.qty > 0).length ? "   •   RBS: " + state.rbs.filter(r => r.type && +r.qty > 0).map(r => r.qty + "x " + r.type).join(" + ") : ""}   •   Sites: ${t.sites}   •   ${ND} days per site   •   Day-time work only   •   Blue = edit   •   Outage start & allowed hours on Dashboard${t.reuseCabling ? "   •   Existing cabling reused" : ""}`, last);
+        TRM ? `${(TRM_METHODS[t.method] || TRM_METHODS.normal).label}${t.compact && t.method === "normal" ? " – both ends on Day 1" : ""}${t.sd ? "   •   Space diversity" : ""}   •   Links: ${t.sites}   •   ${t.sch.days.length} days per link   •   Qty per link end   •   Blue = edit   •   Outage start & allowed hours on Dashboard` : `BB: ${bbText(state)}${(state.rbs || []).filter(r => r.type && +r.qty > 0).length ? "   •   RBS: " + state.rbs.filter(r => r.type && +r.qty > 0).map(r => r.qty + "x " + r.type).join(" + ") : ""}   •   Sites: ${t.sites}   •   ${ND} days per site   •   Day-time work only   •   Blue = edit   •   Outage start & allowed hours on Dashboard${t.reuseCabling ? "   •   Existing cabling reused" : ""}${t.towerType&&t.towerType!=="none"?"   •   "+(t.towerType||"—")+" "+(t.towerHeight||30)+"m":""}`, last);
       navbar(ws, 3);
       hdr(ws, 6, 1, ["SN", "Activity", "What to do", "Who", "Impact", "After SN", "Dur (min)", "Start", "End", "Remarks"]);
       ws.mergeCells(6, G0, 6, last); put(ws, 6, G0, "🕒 TIME MAPPING (30-min slots from team arrival)", { font: { bold: true, ...WHITEF }, fill: HDR, al: CEN });
@@ -1182,6 +1242,28 @@
     return doc;
   }
 
-  const api = { RAN_EXTRA_LIST, RAN_SCEN, autoBalance, removedSteps, planDates, DEFAULT_TRM, TRM_FIXED, TRM_METHODS, trmCat, isAir, equipTxt, unitsOf, buildPdf, leadMin, cutArrive, WEEKEND, sub, bbText, bbNames, finishDate, normalize, daysOf, cutDayOf, DEFAULT_STATE, FIXED, schedule, activities, sitesOf, buildWorkbook, fmt, clock, hm, COLORS };
+  function listBalanceGroups(state,t){
+    const raw=state.domain==="TRM"?trmActivities(state,t,true):ranBuild(state,t);
+    const G={air:"5G AIR installation",qa:"QA & sealing",fin:"Finishing & RSC",sys:"Systemization",dis:"Decommissioning"},seen={},result=[];
+    raw.forEach((d,i)=>d.acts.forEach(a=>{if(!a.group||!a.allow||seen[a.group])return;seen[a.group]=true;result.push({key:a.group,label:G[a.group]||a.group,origDay:i+1,allow:a.allow});}));
+    return result;
+  }
+  function autoBalanceGroups(state,t,enabledSet){
+    const base=JSON.parse(JSON.stringify(t.edits||{}));base.mv=base.mv||{};
+    const tt=Object.assign({},t,{edits:base}),r0=schedule(state,tt);
+    if(r0.days.length<2)return base;
+    const raw=state.domain==="TRM"?trmActivities(state,t,true):ranBuild(state,t);
+    const groups=[],gi={};
+    raw.forEach((d,i)=>d.acts.forEach(a=>{if(!a.group||!a.allow)return;if(enabledSet&&!enabledSet.has(a.group))return;
+      const id=`${i+1}:${a.key}`;if(!gi[a.group]){gi[a.group]={ids:[],orig:i+1,allow:a.allow};groups.push(gi[a.group]);}gi[a.group].ids.push(id);}));
+    if(!groups.length)return base;
+    const setG=(g,k)=>g.ids.forEach(id=>{if(k===g.orig)delete base.mv[id];else base.mv[id]=k;});
+    const score=()=>{const r=schedule(state,tt),h=r.days.map(d=>d.hours);return Math.max(...h)*1000+(Math.max(...h)-Math.min(...h));};
+    groups.forEach(g=>{let best=g.orig,bestS=Infinity;g.allow.forEach(k=>{if(k<1||k>r0.days.length)return;setG(g,k);const s=score();if(s<bestS-0.001){bestS=s;best=k;}});setG(g,best);});
+    return base;
+  }
+  const api = { cabF, towF, rigF, listBalanceGroups, autoBalanceGroups, RAN_EXTRA_LIST, RAN_SCEN, autoBalance, removedSteps, planDates, DEFAULT_TRM, TRM_FIXED, TRM_METHODS, trmCat, isAir, equipTxt, unitsOf, buildPdf, leadMin, cutArrive, WEEKEND, sub, bbText, bbNames, finishDate, normalize, daysOf, cutDayOf, DEFAULT_STATE, FIXED, schedule, activities, sitesOf, buildWorkbook, fmt, clock, hm, COLORS };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.MOP = api;
 })(typeof window !== "undefined" ? window : globalThis);
+
+// ---- TRM trmActivities patch: radswap + dism ----
