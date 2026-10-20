@@ -848,7 +848,7 @@
   const LFT = { horizontal: "left", vertical: "middle", wrapText: true };
   const fx = (formula, result) => ({ formula, result });
   // Dashboard input cells
-  const IC = { arrive: "$C$4", cutArrive: "$C$5", outStart: "$C$6", outMax: "$C$7", maxHours: "$C$8", days: "$C$9", start: "$C$10", teams: "$C$11" };
+  const IC = { outStart: "$C$4", outMax: "$C$5", maxHours: "$C$6", arrive: "$C$7" };
   const DB = k => `Dashboard!${IC[k]}`;
 
   async function buildWorkbook(ExcelJS, stateIn) {
@@ -862,14 +862,13 @@
     const dBy = Object.fromEntries(types.map(t => [t.name, t.sch.days.length])), cBy = Object.fromEntries(types.map(t => [t.name, t.sch.cutIdx]));
     const plan = planDates(state, sites, dBy, cBy);
     const siteDays = sites.reduce((a, x) => a + (dBy[x.type] || 0), 0);
-    const used = new Set(["Dashboard", "Connections", "Site Tracker"]);
+    const used = new Set(["Dashboard", "Connections"]);
     types.forEach((t, i) => { let b = String(t.name || `Type-${i + 1}`).replace(/[*?:\\/\[\]']/g, "-").slice(0, 28).trim() || `Type-${i + 1}`, n = b, k = 2;
       while (used.has(n.toLowerCase()) || used.has(n)) n = `${b.slice(0, 26)}-${k++}`; used.add(n); used.add(n.toLowerCase()); t.sheet = n; });
-    const nav = [["🏠 Dashboard", "Dashboard"], ...types.map(t => [t.sheet, t.sheet]), ["🔌 Connections", "Connections"], ["📅 Site Tracker", "Site Tracker"]];
+    const nav = [["🏠 Dashboard", "Dashboard"], ...types.map(t => [t.sheet, t.sheet]), ["🔌 Connections", "Connections"]];
     const db = wb.addWorksheet("Dashboard", { views: [{ showGridLines: false }], properties: { tabColor: { argb: ARGB(NAVY) } } });
     const tws = types.map(t => wb.addWorksheet(t.sheet, { views: [{ showGridLines: false, state: "frozen", xSplit: 2, ySplit: 6, zoomScale: 85 }], properties: { tabColor: { argb: ARGB(t.color) } } }));
     const cn = wb.addWorksheet("Connections", { views: [{ showGridLines: false }] });
-    const st = wb.addWorksheet("Site Tracker", { views: [{ showGridLines: false, state: "frozen", xSplit: 2, ySplit: 5 }], properties: { tabColor: { argb: "FF2F9E44" } } });
     const banner = (ws, title, sub, lastCol) => {
       ws.mergeCells(1, 1, 1, lastCol); put(ws, 1, 1, title, { font: { size: 16, bold: true, ...WHITEF }, fill: NAVY, al: LFT, border: false }); ws.getRow(1).height = 34;
       ws.mergeCells(2, 1, 2, lastCol); put(ws, 2, 1, sub, { font: { size: 9, italic: true, ...WHITEF }, fill: TEAL, al: LFT, border: false });
@@ -1006,73 +1005,30 @@
     types.forEach((t, j) => cn.getColumn(5 + j).width = 9);
     cn.getColumn(5 + nT).width = 14; cn.getColumn(6 + nT).width = 30;
 
-    // ---------- Site Tracker ----------
-    banner(st, `📅 ${UU} Tracker – auto schedule & progress`, `Dates planned from project start, days per ${U1} type and number of teams (${wk(P).label}). Dates are values – edit blue cells as needed.`, TRM ? 13 : 11);
-    navbar(st, 3);
-    hdr(st, 5, 1, TRM ? ["#", "Link ID", "Link type", "Team", "Start (Day 1)", "Outage day", "End (last day)", "Status", "Progress", "Region", "Remarks", "Site A", "Site B"]
-      : ["#", "Site ID", "Site type", "Team", "Start (Day 1)", "Cutover day", "End (last day)", "Status", "Progress", "Region", "Remarks"]);
-    const typeList = `"${types.map(t => t.name).join(",")}"`, start = new Date(P.startDate + "T00:00:00Z"), code = wk(P).code;
-    const xl = d => d.getTime() / 86400000 + 25569;
-    const regs = String(P.regions || "").split(",").map(x => x.trim()).filter(Boolean);
-    sites.forEach((s, i) => {
-      const r = 6 + i, teams = Math.max(1, +P.teams || 1);
-      const d1 = addWD(P, firstWD(P, start), Math.floor(i / teams) * ND);
-      put(st, r, 1, i + 1, { al: CEN });
-      put(st, r, 2, s.id, { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN });
-      put(st, r, 3, s.type, { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN }); st.getCell(r, 3).dataValidation = { type: "list", allowBlank: true, formulae: [typeList] };
-      if (true) {
-        const pd = plan[i];
-        put(st, r, 4, pd.team, { al: CEN, fmt: '"Team "0' });
-        put(st, r, 5, xl(pd.start), { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN, fmt: "ddd dd-mmm" });
-        put(st, r, 6, xl(pd.cut), { font: { bold: true, color: { argb: "FFC92A2A" } }, fill: IN, al: CEN, fmt: "ddd dd-mmm" });
-        put(st, r, 7, xl(pd.end), { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN, fmt: "ddd dd-mmm" });
-        if (TRM) { put(st, r, 12, s.a || "", { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN }); put(st, r, 13, s.b || "", { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN }); }
-      } else {
-      put(st, r, 4, fx(`MOD(A${r}-1,${DB("teams")})+1`, (i % teams) + 1), { al: CEN, fmt: '"Team "0' });
-      put(st, r, 5, fx(`WORKDAY.INTL(${DB("start")}-1,1+INT((A${r}-1)/${DB("teams")})*${DB("days")},${code})`, xl(d1)), { fill: IN, al: CEN, fmt: "ddd dd-mmm" });
-      put(st, r, 6, fx(`WORKDAY.INTL(E${r},IF(${DB("days")}>=4,2,1),${code})`, xl(addWD(P, d1, CUT - 1))), { al: CEN, fmt: "ddd dd-mmm", font: { bold: true, color: { argb: "FFC92A2A" } } });
-      put(st, r, 7, fx(`WORKDAY.INTL(E${r},${DB("days")}-1,${code})`, xl(addWD(P, d1, ND - 1))), { al: CEN, fmt: "ddd dd-mmm" });
-      }
-      put(st, r, 8, "Not started", { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN }); st.getCell(r, 8).dataValidation = { type: "list", formulae: ['"Not started,In progress,Done,On hold"'] };
-      put(st, r, 9, fx(`IF(H${r}="Done",1,IF(H${r}="In progress",0.5,0))`, 0), { font: { bold: true }, al: CEN, fmt: "0%" });
-      put(st, r, 10, s.gov, { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN });
-      if (regs.length && regs.join(",").length < 250) st.getCell(r, 10).dataValidation = { type: "list", allowBlank: true, formulae: [`"${regs.join(",").replace(/"/g, "")}"`] };
-      put(st, r, 11, "");
-    });
-    const L = 5 + Math.max(1, sites.length);
-    st.addConditionalFormatting({ ref: `I6:I${L}`, rules: [{ type: "dataBar", priority: 1, cfvo: [{ type: "num", value: 0 }, { type: "num", value: 1 }], color: { argb: "FF2F9E44" } }] });
-    st.addConditionalFormatting({ ref: `H6:H${L}`, rules: [["Done", "D3F9D8", "FF2B8A3E"], ["In progress", "FFF3BF", "FFE67700"], ["On hold", "FFE3E3", "FFC92A2A"]].map(([v, c, f], i) =>
-      ({ type: "expression", priority: 2 + i, formulae: [`H6="${v}"`], style: Object.assign(cfFill(c), { font: { bold: true, color: { argb: f } } }) })) });
-    st.addConditionalFormatting({ ref: `E6:G${L}`, rules: [{ type: "expression", priority: 6, formulae: ["E6=TODAY()"], style: Object.assign(cfFill("FFD43B"), { font: { bold: true } }) }] });
-    [4, 12, TRM ? 22 : 10, 9, 14, 14, 14, 13, 10, 14, 26, 14, 14].forEach((w, i) => st.getColumn(i + 1).width = w);
-
     // ---------- Dashboard ----------
+    const xl = d => d.getTime() / 86400000 + 25569;
     const lastDbCol = 6 + ND + 5;
     banner(db, `📡 ${P.name}${P.country ? " – " + P.country : ""} – ${TRM ? "TRM (MW link)" : "RAN"} Installation Dashboard`, TRM ? `TRM • days per link from the swap method • day-time work only • ${sites.length} links • ${nT} link types` : `${ND} days per site • day-time work only • remote integration in parallel with field work • ${sites.length} sites • ${nT} equipment types • BB: ${bbText(state)}`, Math.max(14, lastDbCol));
     navbar(db, 3);
-    const LEAD = leadMin(state);
-    const leads = types.map(t => t.sch.days.find(d => d.cut && !d.lateArrive)).filter(Boolean).map(d => d.lead || 0);
-    const maxLead = leads.length ? Math.max(...leads) : 0;
-    const inputs = [["👷 Team on site (normal days)", hm(P.arrive) / 1440, "hh:mm"], ["👷 Team on site – outage day (auto, earliest type)", fx(`${IC.outStart}-${maxLead}/1440`, Math.max(0, hm(P.outStart) - maxLead) / 1440), "hh:mm", "auto"],
-      ["🔴 Approved outage start", hm(P.outStart) / 1440, "hh:mm"], ["⏳ Max outage allowed (h)", +P.outMax, "0.0"],
-      ["⏱ Max working hours / day", +P.maxHours, "0.0"], [TRM ? "📆 Days per link" : "📆 Days per site", "per type", "@", "auto"],
-      ["🚀 Project start date", xl(start), "ddd dd-mmm-yyyy"], ["👥 Teams in parallel", +P.teams, "0"]];
+    const inputs = [["🔴 Approved outage start", hm(P.outStart) / 1440, "hh:mm"], ["⏳ Max outage allowed (h)", +P.outMax, "0.0"],
+      ["⏱ Max working hours / day", +P.maxHours, "0.0"]];
     inputs.forEach(([l, v, f, auto], i) => {
       const r = 4 + i; db.mergeCells(r, 1, r, 2);
       put(db, r, 1, l, { font: { bold: true }, fill: "E8EEF6", al: LFT });
       put(db, r, 3, v, { font: { bold: true, color: { argb: auto ? "FF000000" : "FF0000FF" } }, fill: auto ? "E9ECEF" : IN, al: CEN, fmt: f });
     });
-    db.getCell(5, 4).value = `= outage start − prep (per ${U1} type)`; db.getCell(5, 4).font = F({ size: 8, italic: true, color: { argb: "FF666666" } });
+    // Hidden row 7: team arrive time – referenced by type-sheet formulas via DB("arrive")
+    put(db, 7, 3, hm(P.arrive) / 1440, { font: { bold: true }, fill: "E9ECEF", al: CEN, fmt: "hh:mm" });
+    db.getRow(7).hidden = true;
     db.mergeCells(13, 1, 15, 3);
-    put(db, 13, 1, TRM ? `ℹ Outage start / allowed hours: change C6–C7 → outage-day arrival and the first outage step move with it; the outage closes when the NOC confirms all sites up, and each link type is flagged if it runs over.\nℹ Days per link follow the swap method chosen in the MOP Generator.` : `ℹ Outage start / allowed hours: change C6–C7 → cutover-day arrival and power-off move with it, outage still closes when 'Cells on air' is done, and each type is flagged if it runs over.\nℹ Days per site and the steps of each day come from the MOP type chosen in the MOP Generator (steps can be added, removed or moved there).`, { font: { size: 9, italic: true, bold: true, color: { argb: "FFC92A2A" } }, al: LFT, border: false });
+    put(db, 13, 1, TRM ? `ℹ Outage start / allowed hours: change C4–C5 → outage-day arrival and the first outage step move with it; the outage closes when the NOC confirms all sites up, and each link type is flagged if it runs over.\nℹ Days per link follow the swap method chosen in the MOP Generator.` : `ℹ Outage start / allowed hours: change C4–C5 → cutover-day arrival and power-off move with it, outage still closes when 'Cells on air' is done, and each type is flagged if it runs over.\nℹ Days per site and the steps of each day come from the MOP type chosen in the MOP Generator (steps can be added, removed or moved there).`, { font: { size: 9, italic: true, bold: true, color: { argb: "FFC92A2A" } }, al: LFT, border: false });
     const H0 = 17, T0 = 18, TL = T0 + nT - 1;
     const dayCols = Array.from({ length: ND }, (_, i) => 6 + i), cOut = 6 + ND, cTot = cOut + 1, cSum = cOut + 2, cStat = cOut + 3, cWin = cOut + 4;
     const lastDay = sites.length ? new Date(Math.max(...plan.map(x => x.end.getTime()))) : new Date(P.startDate + "T00:00:00Z");
     const allOk = types.every(t => t.sch.outOk);
     const cards = [[Us.toUpperCase(), `SUM(D${T0}:D${TL})`, sites.length, "0", "1F77B4"], [`${U1.toUpperCase()}-DAYS`, `SUMPRODUCT(D${T0}:D${TL},E${T0}:E${TL})`, siteDays, "0", "0F766E"],
       ["MAX OUTAGE", `MAX(${CL(cOut)}${T0}:${CL(cOut)}${TL})`, Math.max(...types.map(t => t.sch.outage)) / 1440, "[h]:mm", "C92A2A"],
-      ["🏁 PROJECT FINISH", `MAX('Site Tracker'!G6:G${L})`, xl(lastDay), "dd-mmm-yy", "F59F00"],
-      [`✔ ${Us.toUpperCase()} DONE`, `COUNTIF('Site Tracker'!H6:H${L},"Done")&" / "&COUNTA('Site Tracker'!B6:B${L})`, `0 / ${sites.length}`, "@", "2F9E44"]];
+      ["🏁 PROJECT FINISH", xl(lastDay), xl(lastDay), "dd-mmm-yy", "F59F00"]];
     cards.forEach(([lab, f, v, nf, col], i) => {
       const c = 5 + i * 2;
       db.mergeCells(5, c, 5, c + 1); db.mergeCells(6, c, 8, c + 1);
@@ -1094,7 +1050,7 @@
       const r = T0 + j, s = `'${t.sheet}'!`, n = sites.filter(x => x.type === t.name).length, S = t.sch, K = KP[t.name];
       put(db, r, 1, { text: t.name, hyperlink: `#'${t.sheet}'!A1` }, { font: { bold: true, underline: true, ...WHITEF }, fill: t.color, al: CEN });
       db.mergeCells(r, 2, r, 3); put(db, r, 2, `${TRM ? (TRM_METHODS[t.method] || TRM_METHODS.normal).label + (t.sd ? " + SD" : "") + ": " : ""}${equipTxt(t)}${t.reuseCabling ? " (reuse cabling)" : ""}`, { font: { size: 9 } });
-      put(db, r, 4, fx(`COUNTIF('Site Tracker'!$C$6:$C$${L},"${t.name}")`, n), { font: { bold: true }, al: CEN });
+      put(db, r, 4, n, { font: { bold: true }, al: CEN });
       put(db, r, 5, S.days.length, { al: CEN });
       dayCols.forEach((c, i) => put(db, r, c, S.days[i] ? fx(`${s}${K["d" + (i + 1)]}`, S.days[i].hours / 1440) : null, { al: CEN, fmt: "[h]:mm", fill: S.days[i] ? null : "F2F4F7",
         font: S.days[i] && S.days[i].cut ? { bold: true, color: { argb: "FFC92A2A" } } : { bold: false } }));

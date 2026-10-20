@@ -139,7 +139,7 @@ function render(){
     <p class="hint">Edit any step: move it to another day (D1…), change its minutes, remove it (×) or add your own step at the end of a day. Moved / added steps run after the same crew's last step of that day.</p>
     ${r.days.map(day).join("")}
     ${rem.length?`<div class="removed"><b>Removed steps:</b> ${rem.map(x=>`<button class="chip" data-restore="${esc(x.id)}" title="Restore">↩ D${x.day} ${esc(x.name)}</button>`).join(" ")}</div>`:""}
-    <div class="note">The Excel file has the full MOP for every ${TRMm()?"link":"site"} type: steps, who, dependencies, clock times, time mapping, connections and a ${TRMm()?"link":"site"} tracker with dates. D0 (day-before) preparation is listed on its Dashboard.</div>`;
+    <div class="note">The Excel file has the full MOP for every ${TRMm()?"link":"site"} type: steps, who, dependencies, clock times, time mapping, connections and a Connections sheet. D0 (day-before) preparation is listed on its Dashboard.</div>`;
   $("#stepLib").innerHTML=(TRMm()?M.TRM_FIXED:M.FIXED.concat(M.RAN_EXTRA_LIST)).map(f=>`<option value="${esc(f[1])}">`).join("");
 }
 
