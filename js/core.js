@@ -27,7 +27,7 @@
   const DEFAULT_STATE = () => ({
     domain: "RAN",
     project: { name: "Swap & Modernization", country: "Lebanon", customer: "", prefix: "LB", arrive: "07:00", maxHours: 11,
-      daysPerSite: 2, outStart: "08:00", outMax: 4, startDate: "2026-10-05", teams: 3, sectors: 3, legacyRRU: 6, weekend: "sun", regions: "" },
+      daysPerSite: 2, outStart: "08:00", outMax: 4, startDate: "2026-10-05", teams: 3, sectors: 3, legacyRRU: 6, weekend: "sun", regions: "", cutDay: 0 },
     basebands: [
       { model: "RP6655", status: "New", tech: "4G+5G", qty: 1 },
       { model: "BB5212", status: "Reused", tech: "3G", qty: 1 },
@@ -121,7 +121,7 @@
   };
   const wk = P => WEEKEND[P.weekend] || WEEKEND.sun;
   const daysOf = P => ([2, 3, 4].includes(+P.daysPerSite) ? +P.daysPerSite : 2);
-  const cutDayOf = P => (daysOf(P) === 4 ? 3 : 2);
+  const cutDayOf = P => { const D = daysOf(P), autoCut = D === 4 ? 3 : 2; return +P.cutDay >= 1 && +P.cutDay <= D ? +P.cutDay : autoCut; };
   // team arrives on cutover day just in time for the approved outage start
   const leadMin = S => { const F = S.fixed; return (+F.accessN || 0) + (+F.safetyN || 0) + Math.max(+F.riggingN || 0, +F.precut || 0) + (+F.gng || 0); };
   const cutArrive = S => Math.max(0, hm(S.project.outStart) - leadMin(S));
@@ -156,7 +156,9 @@
   function equipMin(state, model) { const e = state.equipment.find(x => x.model === model); return e ? +e.min : 0; }
 
   function activities(state, t, Dsel) {
-    const F = state.fixed, U = state.unit, P = state.project, D = Dsel || daysOf(P), CUT = D === 4 ? 3 : 2;
+    const F = state.fixed, U = state.unit, P = state.project, D = Dsel || daysOf(P);
+    const autoCut = D === 4 ? 3 : 2;
+    const CUT = +P.cutDay >= 1 && +P.cutDay <= D ? +P.cutDay : autoCut;
     const RAD = radiosOf(t), AIRS = airsOf(t);
     const nr = sumQ(RAD), na = sumQ(AIRS);
     const radTxt = listTxt(RAD, true) || "radios";
@@ -192,19 +194,21 @@
       A("tn", "Transmission", `Connect ${NEW} to TX (new port), check OSS reachability`, "FE", F.tn, ["bbSw"]),
     ];
     // ---- Day 1 (installation)
+    // airOnDay2: true when D=4 and CUT>=3, meaning Day 2 is a dedicated AIR installation day
+    const airOnDay2 = (D === 4 && CUT >= 3);
     const d1 = start1();
     d1.push(A("rig", "Rigging", "Pulley, ropes, rescue kit, exclusion zone", "Tower crew", Math.round((F.rigging1||30)*_rf), ["material"]));
     d1.push(A("radios", "Install radios", `Install ${radTxt} with brackets & grounding next to old RRUs`, "Tower crew", radMin, ["rig"], "", "Old RRUs stay in service"));
     let lastTower = "radios";
-    if (D !== 4) { d1.push(airInstall("radios")); lastTower = "airs"; }
+    if (!airOnDay2) { d1.push(airInstall("radios")); lastTower = "airs"; }
     d1.push(A("radCab", "Radio cabling", `Run & fix DC + fiber for ${nr} radios to ${NEW}; ground kits; weatherproof; labels`, "Tower crew", reuse ? 0 : Math.round(nr * U.cableRadio * _cf), [lastTower], "",
       reuse ? "SKIPPED – existing cabling reused" : "⭐ PRIORITY – needed for cutover. AIR cabling can run in parallel (same route, install once). Skip if existing cabling is reused"));
     d1.push(...bbTrack());
     d1.push(A("powRad", "Power up radios", `Connect radio DC & fiber at ${NEW} side, power up, no HW alarms. Cells LOCKED`, "FE + Ground tech", F.powerRadios, ["radCab", "tn"], "", "Never unlock before jumpers connected"));
     d1.push(A("close", "Close day", "Secure cables, photos, inform NOC leaving site", "All", F.closeDay, ["powRad"]));
-    const days = [{ title: `🔧 DAY 1 – INSTALLATION: ${NEW} + RADIOS${D !== 4 ? " + 5G AIRs" : ""} (no impact)`, acts: d1 }];
-    // ---- Day 2 for 4-day plan: AIRs
-    if (D === 4) {
+    const days = [{ title: `🔧 DAY 1 – INSTALLATION: ${NEW} + RADIOS${!airOnDay2 ? " + 5G AIRs" : ""} (no impact)`, acts: d1 }];
+    // ---- Day 2 for 4-day plan (when CUT>=3): dedicated AIR installation day
+    if (airOnDay2) {
       const d = startN("");
       d.push(A("rig", "Rigging", "Rope & pulley for AIR hoisting", "Tower crew", Math.round((F.riggingN||15)*_rf), ["safety"]));
       d.push(airInstall("rig"));
@@ -215,10 +219,19 @@
       d.forEach(a => { if (["airs", "airCab", "powAir", "nrInt"].includes(a.key)) { a.group = "air"; a.allow = [1, 2]; } });
       days.push({ title: "📡 DAY 2 – 5G AIR INSTALLATION (no impact)", acts: d });
     }
+    // ---- Intermediate days (Days between last install day and cutover day)
+    { const firstCont = airOnDay2 ? 3 : 2;
+      for (let mid = firstCont; mid < CUT; mid++) {
+        const cont = startN("");
+        cont.push(A("rig", "Rigging", "Rope & pulley for continuation of installation work", "Tower crew", Math.round((F.riggingN||15)*_rf), ["safety"]));
+        cont.push(A("close", "Close day", "Secure site, housekeeping, photos, inform NOC", "All", F.closeDay, ["rig"]));
+        days.push({ title: `🔧 DAY ${mid} – INSTALLATION CONTINUATION (no impact)`, acts: cont });
+      }
+    }
     // ---- Cutover day
-    const finishHere = D === 2;
+    const finishHere = CUT >= D;
     const c = startN("; confirm approved outage window");
-    c.push(A("rig", "Rigging", "Rope & pulley ready for jumper swap" + (D !== 4 ? " + AIR cabling" : ""), "Tower crew", Math.round((F.riggingN||15)*_rf), ["safety"]));
+    c.push(A("rig", "Rigging", "Rope & pulley ready for jumper swap" + (!airOnDay2 ? " + AIR cabling" : ""), "Tower crew", Math.round((F.riggingN||15)*_rf), ["safety"]));
     c.push(A("precut", "Pre-cutover check", "Alarm/KPI snapshot & old config backup (remote); FE test calls on site", "Remote integrator + FE", F.precut, ["safety"], "", "Remote, parallel with field"));
     c.push(A("gng", "GO / NO-GO", "Previous-day work OK, integrator & NOC online; approval to start outage", "Team lead + Remote integrator", F.gng, ["rig", "precut"], "", "Any issue = postpone"));
     c.push(A("off", "Power off old equipment", "Lock cells (remote), power off old RRUs & old baseband (site)", "Remote integrator + FE", F.powerOff, ["gng"], "Outage",
@@ -232,7 +245,7 @@
     c.push(A("onair", "Cells on air", "NOC confirms all cells on air", "NOC + Remote integrator", F.onair, ["rf"], "Outage", "🟢 OUTAGE ENDS when this is done – rollback if not OK"));
     let testAfter = "onair";
     const dismAfter = ["onair"];
-    if (D !== 4) {
+    if (!airOnDay2) {
       c.push(airCab(["jump"], "Tower crew free during integration / only if not done on Day 1 (skip if already done or cabling reused)"));
       c.push(A("powAir", "Power up AIRs", `Connect AIR DC & fiber at ${NEW}, power up, no HW alarms`, "Ground tech", F.powerAir, ["airCab"]));
       c.push(A("nrInt", "5G integration", "Load / activate NR config on AIRs", "Remote integrator", F.nrInteg, ["onair", "powAir"], "", "🛰 Remote – parallel with field work"));
