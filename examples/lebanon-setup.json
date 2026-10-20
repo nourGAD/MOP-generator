@@ -1,0 +1,271 @@
+{
+  "domain": "RAN",
+  "project": {
+    "name": "Swap & Modernization",
+    "country": "Lebanon",
+    "prefix": "LB",
+    "arrive": "07:00",
+    "maxHours": 11,
+    "daysPerSite": 2,
+    "outStart": "08:00",
+    "outMax": 4,
+    "startDate": "2026-10-05",
+    "teams": 3,
+    "sectors": 3,
+    "legacyRRU": 6,
+    "weekend": "sun",
+    "regions": ""
+  },
+  "basebands": [
+    {
+      "model": "RP6655",
+      "status": "New",
+      "tech": "4G+5G",
+      "qty": 1
+    },
+    {
+      "model": "BB5212",
+      "status": "Reused",
+      "tech": "3G",
+      "qty": 1
+    }
+  ],
+  "equipment": [
+    {
+      "model": "Radio 4486 B8B20B28",
+      "kind": "radio",
+      "min": 20
+    },
+    {
+      "model": "Radio 4490 B1B3",
+      "kind": "radio",
+      "min": 20
+    },
+    {
+      "model": "Radio 6646 B8B20B28",
+      "kind": "radio",
+      "min": 40
+    },
+    {
+      "model": "AIR 6419 B42",
+      "kind": "air",
+      "min": 60
+    },
+    {
+      "model": "AIR 3219 B42",
+      "kind": "air",
+      "min": 45
+    },
+    {
+      "model": "AIR 3255 B78AA",
+      "kind": "air",
+      "min": 40
+    }
+  ],
+  "unit": {
+    "cableRadio": 15,
+    "cableAIR": 20,
+    "dismantleRRU": 20,
+    "jumperSector": 30
+  },
+  "fixed": {
+    "access": 15,
+    "safety1": 30,
+    "precheck": 30,
+    "material": 30,
+    "rigging1": 30,
+    "bbInstall": 60,
+    "bbPower": 30,
+    "bbSw": 90,
+    "tn": 45,
+    "powerRadios": 30,
+    "closeDay": 20,
+    "accessN": 15,
+    "safetyN": 15,
+    "riggingN": 15,
+    "precut": 20,
+    "gng": 10,
+    "powerOff": 10,
+    "rehome": 30,
+    "txmig": 15,
+    "integ": 60,
+    "rf": 20,
+    "onair": 10,
+    "powerAir": 30,
+    "nrInteg": 30,
+    "nrUnlock": 15,
+    "svc": 45,
+    "ext": 30,
+    "dismBB": 30,
+    "dress": 45,
+    "kpi": 45,
+    "pack": 60,
+    "rsc": 60,
+    "snags": 30,
+    "closeSite": 15,
+    "ehsRsc": 45,
+    "rfi": 30,
+    "preAsm": 60,
+    "connPrep": 30,
+    "enclosure": 30,
+    "encPower": 30,
+    "bbComm": 30,
+    "preInteg": 60,
+    "connect": 30,
+    "integExp": 20,
+    "alarmChk": 30,
+    "srs": 60,
+    "phys": 60,
+    "sealing": 60,
+    "indoorSys": 90,
+    "qaUpload": 120,
+    "rscReview": 60,
+    "docs": 60,
+    "eod": 10
+  },
+  "d0": "SID with site-specific connection diagram, MR for the site, RFI confirmation, site access\nMaterial collection booked (48 h before); discrepancies vs SID / MR reported to IM\nBB serial shared for script generation; scripts uploaded (ESI / ZTI) and checked by TL\nSRS data loaded on SRS server\nWhatsApp / Teams group with all stakeholders\nApproved CR available at least 1 day before",
+  "types": [
+    {
+      "name": "Type-1",
+      "sites": 5,
+      "towerType": "Monopole",
+      "towerHeight": 30,
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Low band",
+          "model": "Radio 4486 B8B20B28",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "Mid band",
+          "model": "Radio 4490 B1B3",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "5G AIR",
+          "model": "AIR 6419 B42",
+          "qty": 3,
+          "min": 60
+        }
+      ],
+      "scenario": "swap",
+      "days": 2,
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
+    },
+    {
+      "name": "Type-2",
+      "sites": 14,
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Low band",
+          "model": "Radio 4486 B8B20B28",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "Mid band",
+          "model": "Radio 4490 B1B3",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "5G AIR",
+          "model": "AIR 3219 B42",
+          "qty": 3,
+          "min": 45
+        }
+      ],
+      "towerType": "Monopole",
+      "towerHeight": 30,
+      "scenario": "swap",
+      "days": 2,
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
+    },
+    {
+      "name": "Type-3",
+      "sites": 1,
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Low band",
+          "model": "Radio 6646 B8B20B28",
+          "qty": 1,
+          "min": 40
+        },
+        {
+          "role": "Mid band",
+          "model": "Radio 4490 B1B3",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "5G AIR",
+          "model": "AIR 3219 B42",
+          "qty": 3,
+          "min": 45
+        }
+      ],
+      "towerType": "Monopole",
+      "towerHeight": 30,
+      "scenario": "swap",
+      "days": 2,
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
+    },
+    {
+      "name": "Type-4",
+      "sites": 5,
+      "reuseCabling": false,
+      "units": [
+        {
+          "role": "Low band",
+          "model": "Radio 4486 B8B20B28",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "Mid band",
+          "model": "Radio 4490 B1B3",
+          "qty": 3,
+          "min": 20
+        },
+        {
+          "role": "5G AIR",
+          "model": "AIR 3255 B78AA",
+          "qty": 3,
+          "min": 40
+        }
+      ],
+      "towerType": "Monopole",
+      "towerHeight": 30,
+      "scenario": "swap",
+      "days": 2,
+      "edits": {
+        "rm": {},
+        "mv": {},
+        "dur": {},
+        "add": []
+      }
+    }
+  ],
+  "rbs": [],
+  "siteList": ""
+}
