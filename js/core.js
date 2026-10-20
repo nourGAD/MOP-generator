@@ -24,14 +24,15 @@
     ["qaUpload", "QA photos upload (Eritop / ECO)", 120], ["rscReview", "RSC review", 60], ["docs", "Acceptance documentation", 60], ["eod", "End-of-day report to IM", 10],
   ];
   const D0_DEFAULT_TXT = "SID with site-specific connection diagram, MR for the site, RFI confirmation, site access\nMaterial collection booked (48 h before); discrepancies vs SID / MR reported to IM\nBB serial shared for script generation; scripts uploaded (ESI / ZTI) and checked by TL\nSRS data loaded on SRS server\nWhatsApp / Teams group with all stakeholders\nApproved CR available at least 1 day before";
+  // Default basebands used for new types and for migration from old global-basebands format
+  const DEF_BASEBANDS = () => [
+    { model: "RP6655", status: "New", tech: "4G+5G", qty: 1 },
+    { model: "BB5212", status: "Reused", tech: "3G", qty: 1 },
+  ];
   const DEFAULT_STATE = () => ({
     domain: "RAN",
     project: { name: "Swap & Modernization", country: "Lebanon", customer: "", prefix: "LB", arrive: "07:00", maxHours: 11,
       daysPerSite: 2, outStart: "08:00", outMax: 4, outageDay: 2, startDate: "2026-10-05", teams: 3, sectors: 3, legacyRRU: 6, weekend: "sun", regions: "" },
-    basebands: [
-      { model: "RP6655", status: "New", tech: "4G+5G", qty: 1 },
-      { model: "BB5212", status: "Reused", tech: "3G", qty: 1 },
-    ],
     equipment: [
       { model: "Radio 4486 B8B20B28", kind: "radio", min: 20 },
       { model: "Radio 4490 B1B3", kind: "radio", min: 20 },
@@ -44,24 +45,27 @@
     fixed: Object.fromEntries(FIXED.concat(RAN_EXTRA_LIST).map(f => [f[0], f[2]])),
     d0: D0_DEFAULT_TXT,
     types: [
-      { name: "Type-1", sites: 5, towerType: "Monopole", towerHeight: 30, reuseCabling: false, units: [
+      { name: "Type-1", sites: 5, towerType: "Monopole", towerHeight: 30, reuseCabling: false,
+        rbs: [], basebands: DEF_BASEBANDS(), units: [
         { role: "Low band", model: "Radio 4486 B8B20B28", qty: 3, min: 20 },
         { role: "Mid band", model: "Radio 4490 B1B3", qty: 3, min: 20 },
         { role: "5G AIR", model: "AIR 6419 B42", qty: 3, min: 60 } ] },
-      { name: "Type-2", sites: 14, reuseCabling: false, units: [
+      { name: "Type-2", sites: 14, reuseCabling: false,
+        rbs: [], basebands: DEF_BASEBANDS(), units: [
         { role: "Low band", model: "Radio 4486 B8B20B28", qty: 3, min: 20 },
         { role: "Mid band", model: "Radio 4490 B1B3", qty: 3, min: 20 },
         { role: "5G AIR", model: "AIR 3219 B42", qty: 3, min: 45 } ] },
-      { name: "Type-3", sites: 1, reuseCabling: false, units: [
+      { name: "Type-3", sites: 1, reuseCabling: false,
+        rbs: [], basebands: DEF_BASEBANDS(), units: [
         { role: "Low band", model: "Radio 6646 B8B20B28", qty: 1, min: 40 },
         { role: "Mid band", model: "Radio 4490 B1B3", qty: 3, min: 20 },
         { role: "5G AIR", model: "AIR 3219 B42", qty: 3, min: 45 } ] },
-      { name: "Type-4", sites: 5, reuseCabling: false, units: [
+      { name: "Type-4", sites: 5, reuseCabling: false,
+        rbs: [], basebands: DEF_BASEBANDS(), units: [
         { role: "Low band", model: "Radio 4486 B8B20B28", qty: 3, min: 20 },
         { role: "Mid band", model: "Radio 4490 B1B3", qty: 3, min: 20 },
         { role: "5G AIR", model: "AIR 3255 B78AA", qty: 3, min: 40 } ] },
     ],
-    rbs: [],
     siteList: "",
   });
 
@@ -92,11 +96,16 @@
     const op = (x && x.project) || {};
     s.project = Object.assign({}, d.project, op); if (!s.project.outageDay) s.project.outageDay = 2;
     if (op.day1Arrive && !op.arrive) s.project.arrive = op.day1Arrive;
+    // Migrate very old format: newBB/oldBB project fields → basebands array kept for per-type migration below
+    let legacyBB = null;
     if (!x || !Array.isArray(x.basebands)) {
       const b = [];
       if (op.newBB !== undefined) { if (op.newBB) b.push({ model: op.newBB, status: "New", tech: "4G+5G", qty: 1 }); if (op.oldBB) b.push({ model: op.oldBB, status: "Reused", tech: "3G", qty: 1 }); }
-      s.basebands = b.length ? b : d.basebands;
+      legacyBB = b.length ? b : null;
+    } else if (Array.isArray(x.basebands) && x.basebands.length) {
+      legacyBB = x.basebands; // old global basebands → migrate to per-type below
     }
+    const legacyRBS = Array.isArray(x && x.rbs) && x.rbs.length ? x.rbs : null;
     s.fixed = Object.assign({}, d.fixed, (x && x.fixed) || {}); if (typeof s.d0 !== "string") s.d0 = d.d0;
     s.unit = Object.assign({}, d.unit, (x && x.unit) || {});
     if (!Array.isArray(s.types) || !s.types.length) s.types = d.types;
@@ -109,9 +118,13 @@
       if (t.airModel) u.push({ role: "5G AIR", model: t.airModel, qty: +t.airQty || 0, min: libMin(t.airModel) });
       return { name: t.name, sites: t.sites, reuseCabling: !!t.reuseCabling, units: u };
     });
-    if (!Array.isArray(s.rbs)) s.rbs = [];
-    s.types.forEach(t => { if (!t.towerType) t.towerType="Monopole"; if (!t.towerHeight) t.towerHeight=30; if (!RAN_SCEN[t.scenario]) t.scenario = "swap"; if (!RAN_SCEN[t.scenario].days.includes(+t.days)) t.days = t.scenario === "swap" && [2, 3, 4].includes(+s.project.daysPerSite) ? +s.project.daysPerSite : RAN_SCEN[t.scenario].def;
-      if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, add: [] }; });
+    s.types.forEach(t => {
+      // migrate per-type rbs / basebands (copy from global if per-type arrays not yet present)
+      if (!Array.isArray(t.rbs)) t.rbs = legacyRBS ? legacyRBS.map(r => Object.assign({}, r)) : [];
+      if (!Array.isArray(t.basebands)) t.basebands = legacyBB ? legacyBB.map(b => Object.assign({}, b)) : DEF_BASEBANDS();
+      if (!t.towerType) t.towerType="Monopole"; if (!t.towerHeight) t.towerHeight=30; if (!RAN_SCEN[t.scenario]) t.scenario = "swap"; if (!RAN_SCEN[t.scenario].days.includes(+t.days)) t.days = t.scenario === "swap" && [2, 3, 4].includes(+s.project.daysPerSite) ? +s.project.daysPerSite : RAN_SCEN[t.scenario].def;
+      if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, add: [] };
+    });
     return s;
   }
 
@@ -121,7 +134,11 @@
   };
   const wk = P => WEEKEND[P.weekend] || WEEKEND.sun;
   const daysOf = P => ([2, 3, 4].includes(+P.daysPerSite) ? +P.daysPerSite : 2);
-  const cutDayOf = P => (daysOf(P) === 4 ? 3 : 2);
+  const cutDayOf = (P, D) => {
+    const d = D || daysOf(P);
+    if (+P.outageDay === 0) return 0;
+    return Math.min(d, Math.max(d === 4 ? 3 : 2, +(P.outageDay || (d === 4 ? 3 : 2))));
+  };
   // team arrives on cutover day just in time for the approved outage start
   const leadMin = S => { const F = S.fixed; return (+F.accessN || 0) + (+F.safetyN || 0) + Math.max(+F.riggingN || 0, +F.precut || 0) + (+F.gng || 0); };
   const cutArrive = S => Math.max(0, hm(S.project.outStart) - leadMin(S));
@@ -156,17 +173,20 @@
   function equipMin(state, model) { const e = state.equipment.find(x => x.model === model); return e ? +e.min : 0; }
 
   function activities(state, t, Dsel) {
-    const F = state.fixed, U = state.unit, P = state.project, D = Dsel || daysOf(P), CUT = +(P.outageDay) === 0 ? 0 : Math.min(D, Math.max(1, +(P.outageDay || (D === 4 ? 3 : 2))));
+    const F = state.fixed, U = state.unit, P = state.project, D = Dsel || daysOf(P);
+    // CUT: which physical day number is the cutover. Clamp so it can't clash with fixed days
+    // (Day 2 is AIR-install day on 4-day plans, so CUT must be ≥ 3 then; otherwise ≥ 2)
+    const CUT = +(P.outageDay) === 0 ? 0 : Math.min(D, Math.max(D === 4 ? 3 : 2, +(P.outageDay || (D === 4 ? 3 : 2))));
     const RAD = radiosOf(t), AIRS = airsOf(t);
     const nr = sumQ(RAD), na = sumQ(AIRS);
     const radTxt = listTxt(RAD, true) || "radios";
     const _h = +t.towerHeight||30, _cf = cabF(_h), _tf = towF(_h), _rf = rigF(_h);
     const radMin = Math.round(sumMin(RAD)*_tf), airMin = Math.round(sumMin(AIRS)*_tf);
     const reuse = !!t.reuseCabling, heavy = AIRS.some(u => /6419|64T/.test(u.model));
-    const RBS = (state.rbs || []).filter(r => r.type && +r.qty > 0);
-    const newN = bbQty(state, "New"), oldN = bbQty(state, "Reused");
-    const NEW = bbNames(state, "New") || "new baseband", OLD = bbNames(state, "Reused");
-    const oldTech = bbList(state, "Reused").map(b => b.tech).filter(Boolean).join("/") || "legacy";
+    const RBS = (t.rbs || []).filter(r => r.type && +r.qty > 0);
+    const newN = bbQty(t, "New"), oldN = bbQty(t, "Reused");
+    const NEW = bbNames(t, "New") || "new baseband", OLD = bbNames(t, "Reused");
+    const oldTech = bbList(t, "Reused").map(b => b.tech).filter(Boolean).join("/") || "legacy";
     const A = (key, name, desc, who, dur, after, impact, rem, extra) => Object.assign({ key, name, desc, who, dur: Math.max(0, Math.round(+dur || 0)), after: after || [], impact: impact || "Non-SA", rem: rem || "" }, extra || {});
     const start1 = () => [
       A("access", "Site access & PTW", "Request site access from NOC with CR no.; permit / landlord / security clearance", "All", F.access),
@@ -215,8 +235,20 @@
       d.forEach(a => { if (["airs", "airCab", "powAir", "nrInt"].includes(a.key)) { a.group = "air"; a.allow = [1, 2]; } });
       days.push({ title: "📡 DAY 2 – 5G AIR INSTALLATION (no impact)", acts: d });
     }
+    // ---- Intermediate continuation days (when cutover is later than the first possible day)
+    // firstCont = the first day number that could be a continuation day
+    // (for 4-day plans Day 2 is AIR install, so continuation starts at 3; otherwise at 2)
+    const firstCont = D === 4 ? 3 : 2;
+    for (let mid = firstCont; mid < CUT; mid++) {
+      const m = startN("");
+      m.push(A("cont", "Continuation – installation & preparation",
+        "Complete any remaining installation tasks (cabling, indoor works); prepare equipment for cutover; update IM",
+        "All", 0, ["safety"]));
+      m.push(A("close", "Close day", "Housekeeping, photos, inform NOC leaving site", "All", F.closeDay, ["cont"]));
+      days.push({ title: `🔧 DAY ${mid} – CONTINUATION: INSTALLATION & PREPARATION (no impact)`, acts: m });
+    }
     // ---- Cutover day
-    const finishHere = D === 2;
+    const finishHere = CUT >= D;
     const c = startN("; confirm approved outage window");
     c.push(A("rig", "Rigging", "Rope & pulley ready for jumper swap" + (D !== 4 ? " + AIR cabling" : ""), "Tower crew", Math.round((F.riggingN||15)*_rf), ["safety"]));
     c.push(A("precut", "Pre-cutover check", "Alarm/KPI snapshot & old config backup (remote); FE test calls on site", "Remote integrator + FE", F.precut, ["safety"], "", "Remote, parallel with field"));
@@ -296,8 +328,8 @@
     const F = state.fixed, U = state.unit;
     const RAD = radiosOf(t), AIRS = airsOf(t), nr = sumQ(RAD), na = sumQ(AIRS), reuse = !!t.reuseCabling;
     const _h2 = +t.towerHeight||30, _cf2 = cabF(_h2), _tf2 = towF(_h2), _rf2 = rigF(_h2);
-    const newN = bbQty(state, "New"), NEW = bbNames(state, "New") || "new baseband";
-    const RBS = (state.rbs || []).filter(r => r.type && +r.qty > 0);
+    const newN = bbQty(t, "New"), NEW = bbNames(t, "New") || "new baseband";
+    const RBS = (t.rbs || []).filter(r => r.type && +r.qty > 0);
     const A = (key, name, desc, who, dur, after, impact, rem, extra) => Object.assign({ key, name, desc, who, dur: Math.max(0, Math.round(+dur || 0)), after: after || [], impact: impact || "Non-SA", rem: rem || "" }, extra || {});
     const TW = "Tower crew", GT = "Ground tech", RI = "Remote integrator";
     const start = (first) => [
@@ -891,7 +923,7 @@
     types.forEach((t, ti) => {
       const ws = tws[ti], last = G0 + NS - 1, S = t.sch;
       banner(ws, `MOP ${t.name}  |  ${equipTxt(t)}`,
-        TRM ? `${(TRM_METHODS[t.method] || TRM_METHODS.normal).label}${t.compact && t.method === "normal" ? " – both ends on Day 1" : ""}${t.sd ? "   •   Space diversity" : ""}   •   Links: ${t.sites}   •   ${t.sch.days.length} days per link   •   Qty per link end   •   Blue = edit   •   Outage start & allowed hours on Dashboard` : `BB: ${bbText(state)}${(state.rbs || []).filter(r => r.type && +r.qty > 0).length ? "   •   RBS: " + state.rbs.filter(r => r.type && +r.qty > 0).map(r => r.qty + "x " + r.type).join(" + ") : ""}   •   Sites: ${t.sites}   •   ${ND} days per site   •   Day-time work only   •   Blue = edit   •   Outage start & allowed hours on Dashboard${t.reuseCabling ? "   •   Existing cabling reused" : ""}${t.towerType&&t.towerType!=="none"?"   •   "+(t.towerType||"—")+" "+(t.towerHeight||30)+"m":""}`, last);
+        TRM ? `${(TRM_METHODS[t.method] || TRM_METHODS.normal).label}${t.compact && t.method === "normal" ? " – both ends on Day 1" : ""}${t.sd ? "   •   Space diversity" : ""}   •   Links: ${t.sites}   •   ${t.sch.days.length} days per link   •   Qty per link end   •   Blue = edit   •   Outage start & allowed hours on Dashboard` : `BB: ${bbText(t)}${(t.rbs || []).filter(r => r.type && +r.qty > 0).length ? "   •   RBS: " + t.rbs.filter(r => r.type && +r.qty > 0).map(r => r.qty + "x " + r.type).join(" + ") : ""}   •   Sites: ${t.sites}   •   ${ND} days per site   •   Day-time work only   •   Blue = edit   •   Outage start & allowed hours on Dashboard${t.reuseCabling ? "   •   Existing cabling reused" : ""}${t.towerType&&t.towerType!=="none"?"   •   "+(t.towerType||"—")+" "+(t.towerHeight||30)+"m":""}`, last);
       navbar(ws, 3);
       hdr(ws, 6, 1, ["SN", "Activity", "What to do", "Who", "Impact", "After SN", "Dur (min)", "Start", "End", "Remarks"]);
       ws.mergeCells(6, G0, 6, last); put(ws, 6, G0, "🕒 TIME MAPPING (30-min slots from team arrival)", { font: { bold: true, ...WHITEF }, fill: HDR, al: CEN });
@@ -976,8 +1008,12 @@
     });
 
     // ---------- Connections ----------
-    const nT = types.length, NEWB = bbList(state, "New"), OLDB = bbList(state, "Reused");
-    const newName = bbNames(state, "New") || "New baseband";
+    const nT = types.length;
+    // Aggregate basebands/RBS from all types for the Connections sheet
+    const NEWB = types.flatMap(t => bbList(t, "New"));
+    const OLDB = types.flatMap(t => bbList(t, "Reused"));
+    const allRBS = types.flatMap(t => (t.rbs || []).filter(r => r.type && +r.qty > 0));
+    const newName = NEWB.length ? NEWB.map(b => b.model).filter((m, i, a) => a.indexOf(m) === i).join(" / ") : "New baseband";
     banner(cn, "🔌 Connections – what connects to what", TRM ? "Exact ports per approved LB. Qty per link end (x2 for both ends) in blue." : "Exact ports per approved design / RND. Qty per site type in blue. 'Step' = MOP step where it is done.", 6 + nT);
     navbar(cn, 3);
     hdr(cn, 5, 1, ["#", "From", "To", "Cable / type", ...types.map(t => t.name), "Step", "Remarks"]);
@@ -997,13 +1033,13 @@
       ...ROLES.map(role => [newName, role, "Fiber CPRI + SFP", t => sumQ(unitsOf(t).filter(u => (u.role || "Radio") === role)), /AIR|5G|NR/i.test(role) ? airDay : "Day 1", "One per unit"]),
       ...OLDB.map(b => [`${b.model} (reused${b.tech ? ", " + b.tech : ""})`, "New radios", "Fiber CPRI + SFP", () => +b.qty, "Cutover (outage)", "Re-home during outage"]),
       ...NEWB.map(b => ["Rectifier / PDU", b.model, "DC power + CB", () => +b.qty, "Day 1", ""]),
-      ...(state.rbs || []).filter(r => r.type && +r.qty > 0).map(r => ["Rectifier / PDU", r.type, "DC power + CB", () => +r.qty, "Day 1", "New RBS"]),
+      ...allRBS.map(r => ["Rectifier / PDU", r.type, "DC power + CB", () => +r.qty, "Day 1", "New RBS"]),
       ["Rectifier / PDU", "Radios", "DC power cable + CB", t => sumQ(radiosOf(t)), "Day 1", ""],
       ["Rectifier / PDU", "AIRs", "DC power cable + CB", t => sumQ(airsOf(t)), airDay, ""],
       ["Radios", "Existing antennas", "RF jumpers (per port map)", () => "map", "Cutover (outage)", "Torque + weatherproof"],
       [newName, "TX / MW / router", "Ethernet / fiber backhaul", () => 1, "Day 1 / cutover", "New port Day 1, migration on cutover"],
       ["Site alarms", "New / reused basebands", "Alarm cable", () => 1, "Cutover day", ""],
-      ["All new units", "Site ground bar", "Grounding cable", t => sumQ(unitsOf(t)) + bbQty(state, "New") + (state.rbs || []).reduce((a, r) => a + (r.type ? +r.qty || 0 : 0), 0), "Day 1", "Radios + AIRs + new basebands + RBS"],
+      ["All new units", "Site ground bar", "Grounding cable", t => sumQ(unitsOf(t)) + bbQty(t, "New") + (t.rbs || []).reduce((a, r) => a + (r.type ? +r.qty || 0 : 0), 0), "Day 1", "Radios + AIRs + new basebands + RBS"],
     ];
     conn.forEach(([a, b, c, q, s, rm], i) => {
       const r = 6 + i, z = i % 2 ? "F7F9FC" : null;
@@ -1018,7 +1054,9 @@
     // ---------- Dashboard ----------
     const xl = d => d.getTime() / 86400000 + 25569;
     const lastDbCol = 6 + ND + 5;
-    banner(db, `📡 ${P.name}${P.country ? " – " + P.country : ""} – ${TRM ? "TRM (MW link)" : "RAN"} Installation Dashboard`, TRM ? `TRM • days per link from the swap method • day-time work only • ${sites.length} links • ${nT} link types` : `${ND} days per site • day-time work only • remote integration in parallel with field work • ${sites.length} sites • ${nT} equipment types • BB: ${bbText(state)}`, Math.max(14, lastDbCol));
+    const allBBText = types.flatMap(t => (t.basebands || []).filter(b => b.model && +b.qty > 0))
+      .map(b => `${b.qty}x ${b.status === "New" ? "New" : "Reuse"} ${b.model}${b.tech ? ` (${b.tech})` : ""}`).join(" + ") || "No baseband defined";
+    banner(db, `📡 ${P.name}${P.country ? " – " + P.country : ""} – ${TRM ? "TRM (MW link)" : "RAN"} Installation Dashboard`, TRM ? `TRM • days per link from the swap method • day-time work only • ${sites.length} links • ${nT} link types` : `${ND} days per site • day-time work only • remote integration in parallel with field work • ${sites.length} sites • ${nT} equipment types • BB: ${allBBText}`, Math.max(14, lastDbCol));
     navbar(db, 3);
     const inputs = [["🔴 Approved outage start", hm(P.outStart) / 1440, "hh:mm"], ["⏳ Max outage allowed (h)", +P.outMax, "0.0"],
       ["⏱ Max working hours / day", +P.maxHours, "0.0"]];
@@ -1141,7 +1179,7 @@
         ["Allowed outage", allowed], ["Rollback", "Every outage day has a rollback decision – old link kept until NOC confirms all sites up"], ["Working day limit", `${P.maxHours} h, day-time only`],
         ["Teams / start", `${P.teams} teams from ${P.startDate} – finish ${finish.toISOString().slice(0, 10)}`]]
       : [["Days per site", "Set by the MOP type of each site type (see table)"], ["Team on site", `${P.arrive}; on the cutover day the team arrives just in time for the approved outage start`],
-        ["Allowed outage", allowed], ["Basebands", clean(bbText(state))], ["Working day limit", `${P.maxHours} h, day-time only`],
+        ["Allowed outage", allowed], ["Basebands", clean(allBBText)], ["Working day limit", `${P.maxHours} h, day-time only`],
         ["Teams / start", `${P.teams} teams from ${P.startDate} – finish ${finish.toISOString().slice(0, 10)}`]] });
     y = doc.lastAutoTable.finalY + 7;
     doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text(TRM ? "Link types at a glance" : "Site types at a glance", M0, y); y += 2;
@@ -1169,7 +1207,7 @@
       const S = t.sch;
       S.days.forEach((d, di) => {
         doc.addPage();
-        head(`${t.name}  |  Day ${di + 1} of ${S.days.length}${d.cut ? (TRM ? "  –  OUTAGE DAY" : "  –  CUTOVER") : ""}`, clean(TRM ? `${(TRM_METHODS[t.method] || TRM_METHODS.normal).label}  |  per end: ${equipTxt(t)}` : `${equipTxt(t)}  |  BB: ${bbText(state)}`));
+        head(`${t.name}  |  Day ${di + 1} of ${S.days.length}${d.cut ? (TRM ? "  –  OUTAGE DAY" : "  –  CUTOVER") : ""}`, clean(TRM ? `${(TRM_METHODS[t.method] || TRM_METHODS.normal).label}  |  per end: ${equipTxt(t)}` : `${equipTxt(t)}  |  BB: ${bbText(t)}`));
         doc.setFont("helvetica", "bold"); doc.setFontSize(10.5);
         doc.text(clean(d.title.replace(/^\S+\s/, "")), M0, 28);
         doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(74, 88, 104);

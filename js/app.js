@@ -51,6 +51,23 @@ function renderInputs(){
     ${TRMm()?`<div class="opts"><label class="f">Swap method<select data-t="method">${Object.entries(M.TRM_METHODS).map(([k,v])=>`<option value="${k}" ${t.method===k?"selected":""}>${esc(v.label)}</option>`).join("")}</select></label>
       ${["normal","new","radswap"].includes(t.method)?`<label class="chk"><input type="checkbox" data-t="compact" ${t.compact?"checked":""}> Install both ends on Day 1 (small antennas)</label>`:""}
       <label class="chk"><input type="checkbox" data-t="sd" ${t.sd?"checked":""}> Space diversity (SD) – adds Main-Div alignment</label></div>`:""}
+    ${!TRMm()?`<div class="rbs-bb-wrap">
+      <div class="uh rbh"><span>RBS / cabinet</span><span>Qty</span><span>Min/unit</span><span></span></div>
+      ${(t.rbs||[]).map((r,k)=>`<div class="rb" data-r="${k}">
+        <input type="text" data-rb="type" value="${esc(r.type)}" placeholder="e.g. RBS 6150">
+        <input type="number" min="0" max="9" data-rb="qty" value="${r.qty}">
+        <input type="number" min="0" data-rb="min" value="${r.min}">
+        <button class="x" data-rdel="${k}" aria-label="Remove RBS">×</button></div>`).join("")}
+      <button class="add sm" data-radd="${i}">+ Add RBS</button>
+      <div class="uh bbh" style="margin-top:6px"><span>Baseband · model</span><span>Status</span><span>Tech</span><span>Qty</span><span></span></div>
+      ${(t.basebands||[]).map((b,k)=>`<div class="bb" data-b="${k}">
+        <input type="text" data-bb="model" value="${esc(b.model)}" placeholder="Model">
+        <select data-bb="status"><option ${b.status==="New"?"selected":""}>New</option><option ${b.status==="Reused"?"selected":""}>Reused</option></select>
+        <input type="text" data-bb="tech" value="${esc(b.tech)}" placeholder="e.g. 4G+5G">
+        <input type="number" min="0" max="9" data-bb="qty" value="${b.qty}">
+        <button class="x" data-bdel="${k}" aria-label="Remove baseband">×</button></div>`).join("")}
+      <button class="add sm" data-badd="${i}">+ Add baseband</button>
+    </div>`:""}
     <div class="uh"><span>${TRMm()?"Part · model (per link end)":"Part / band · model"}</span><span>Qty</span><span>Min/unit</span><span></span></div>
     ${(t.units||[]).map((u,k)=>`<div class="un" data-u="${k}">
       <input type="text" list="roles" data-uk="role" value="${esc(u.role)}" aria-label="Part or band" placeholder="e.g. Low band">
@@ -67,18 +84,7 @@ function renderInputs(){
     <select data-k="kind" aria-label="Kind"><option value="radio" ${e.kind==="radio"?"selected":""}>Radio</option><option value="air" ${e.kind==="air"?"selected":""}>AIR</option></select>
     <input type="number" min="0" data-k="min" value="${e.min}" aria-label="Minutes">
     <button class="x" data-edel="${i}" aria-label="Remove model">×</button></div>`).join("");
-  $("#rbsList").innerHTML=(S.rbs||[]).map((r,i)=>`<div class="rb" data-r="${i}">
-    <input type="text" data-rb="type" value="${esc(r.type)}" aria-label="RBS type" placeholder="e.g. RBS 6150 outdoor">
-    <input type="number" min="0" max="9" data-rb="qty" value="${r.qty}" aria-label="Quantity">
-    <input type="number" min="0" data-rb="min" value="${r.min}" aria-label="Minutes per unit">
-    <button class="x" data-rdel="${i}" aria-label="Remove RBS">×</button></div>`).join("")||'<p class="hint" style="margin:0 0 8px">No new RBS on this project.</p>';
   $("#models").innerHTML=S.equipment.map(e=>`<option value="${esc(e.model)}">`).join("");
-  $("#bbs").innerHTML=(S.basebands||[]).map((b,i)=>`<div class="bb" data-b="${i}">
-    <input type="text" data-bb="model" value="${esc(b.model)}" aria-label="Baseband model" placeholder="Model">
-    <select data-bb="status" aria-label="New or reused"><option ${b.status==="New"?"selected":""}>New</option><option ${b.status==="Reused"?"selected":""}>Reused</option></select>
-    <input type="text" data-bb="tech" value="${esc(b.tech)}" aria-label="Technologies" placeholder="e.g. 4G+5G">
-    <input type="number" min="0" max="9" data-bb="qty" value="${b.qty}" aria-label="Quantity">
-    <button class="x" data-bdel="${i}" aria-label="Remove baseband">×</button></div>`).join("")||'<p class="hint">No baseband – add at least one new baseband.</p>';
   updCut();
   $("#fixed").innerHTML=(TRMm()?M.TRM_FIXED:M.FIXED).map(([k,l])=>`<div class="fx"><span>${esc(l)}</span><input type="number" min="0" data-f="${k}" value="${S.fixed[k]}"></div>`).join("");
 }
@@ -149,7 +155,7 @@ document.addEventListener("input",e=>{
   if(el.dataset.p){ S.project[el.dataset.p]=v; document.querySelectorAll(`[data-p="${el.dataset.p}"]`).forEach(o=>{if(o!==el)o.value=v});
     updCut(); }
   else if(el.id==="pname") S.project.name=v;
-  else if(el.dataset.bb){const i=+el.closest(".bb").dataset.b; S.basebands[i][el.dataset.bb]=v}
+  else if(el.dataset.bb){const ti=+el.closest(".tcard").dataset.i; const bi=+el.closest(".bb").dataset.b; S.types[ti].basebands[bi][el.dataset.bb]=v}
   else if(el.dataset.u) S.unit[el.dataset.u]=v;
   else if(el.dataset.f){ S.fixed[el.dataset.f]=v; updCut(); }
   else if(el.id==="sites") S.siteList=el.value;
@@ -158,7 +164,7 @@ document.addEventListener("input",e=>{
   else if(el.dataset.uk){const i=+el.closest(".tcard").dataset.i, k=+el.closest(".un").dataset.u, u=S.types[i].units[k]; u[el.dataset.uk]=v;
     if(el.dataset.uk==="model"){const e=S.equipment.find(q=>q.model===v); if(e){u.min=+e.min; el.closest(".un").querySelector('[data-uk="min"]').value=u.min}}
     if(el.dataset.uk==="role"||el.dataset.uk==="model"){const ki=el.closest(".un").querySelector(".kind"), k2=kindOf(u); ki.textContent=k2.txt; ki.className="kind "+k2.cls} }
-  else if(el.dataset.rb){const i=+el.closest(".rb").dataset.r; S.rbs[i][el.dataset.rb]=v}
+  else if(el.dataset.rb){const ti=+el.closest(".tcard").dataset.i; const ri=+el.closest(".rb").dataset.r; S.types[ti].rbs[ri][el.dataset.rb]=v}
   else if(el.dataset.t){const i=+el.closest(".tcard").dataset.i, tt=S.types[i]; tt[el.dataset.t]=v;
     if(["towerType","towerHeight"].includes(el.dataset.t)){
       const ci=+el.closest(".tcard").dataset.i; S.types[ci][el.dataset.t]=el.dataset.num?+el.value:el.value;
@@ -203,13 +209,13 @@ document.addEventListener("click",e=>{
   else if(b.dataset.uadd!==undefined){const t=S.types[+b.dataset.uadd]; t.units=t.units||[]; t.units.push(TRMm()?{role:"",model:"",qty:1,min:30}:{role:"",model:"",qty:3,min:20}); renderInputs(); render();
     const c=document.querySelector(`.tcard[data-i="${b.dataset.uadd}"]`); const r=c.querySelectorAll('[data-uk="role"]'); r[r.length-1].focus()}
   else if(b.dataset.udel!==undefined){const i=+b.closest(".tcard").dataset.i; S.types[i].units.splice(+b.dataset.udel,1); renderInputs(); render()}
-  else if(b.dataset.rdel!==undefined){S.rbs.splice(+b.dataset.rdel,1); renderInputs(); render()}
-  else if(b.dataset.bdel!==undefined){S.basebands.splice(+b.dataset.bdel,1);renderInputs();render()}
+  else if(b.dataset.rdel!==undefined){const ti=+b.closest(".tcard").dataset.i; S.types[ti].rbs.splice(+b.dataset.rdel,1); renderInputs(); render()}
+  else if(b.dataset.bdel!==undefined){const ti=+b.closest(".tcard").dataset.i; S.types[ti].basebands.splice(+b.dataset.bdel,1);renderInputs();render()}
+  else if(b.dataset.radd!==undefined){S.types[+b.dataset.radd].rbs.push({type:"",qty:1,min:90}); renderInputs(); render(); const x=document.querySelectorAll('[data-rb="type"]'); x[x.length-1].focus()}
+  else if(b.dataset.badd!==undefined){S.types[+b.dataset.badd].basebands.push({model:"",status:"New",tech:"",qty:1}); renderInputs(); render(); const x=document.querySelectorAll('[data-bb="model"]'); x[x.length-1].focus()}
   else if(b.dataset.edel!==undefined){const m=S.equipment[+b.dataset.edel].model; /* models stay usable as free text */ S.equipment.splice(+b.dataset.edel,1);renderInputs();render()}
 });
-$("#addRBS").onclick=()=>{S.rbs.push({type:"",qty:1,min:90}); renderInputs(); render(); const x=document.querySelectorAll('[data-rb="type"]'); x[x.length-1].focus()};
 $("#addType").onclick=()=>{const l=S.types[S.types.length-1]; S.types.push(Object.assign({},JSON.parse(JSON.stringify(l)),{name:"Type-"+(S.types.length+1),sites:1})); sel=S.types.length-1; renderInputs(); render()};
-$("#addBB").onclick=()=>{S.basebands.push({model:"",status:"New",tech:"",qty:1}); renderInputs(); render(); const x=document.querySelectorAll('[data-bb="model"]'); x[x.length-1].focus()};
 $("#addEq").onclick=()=>{S.equipment.push({model:"New model",kind:"radio",min:20}); renderInputs(); render()};
 $("#reset").onclick=()=>{S=TRMm()?M.normalize(M.DEFAULT_TRM()):M.DEFAULT_STATE(); ALL[ALL.mode]=S; sel=0; renderInputs(); render(); toast(`Default ${ALL.mode} setup restored.`)};
 

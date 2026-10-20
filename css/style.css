@@ -123,6 +123,8 @@ label.ghost{display:inline-flex;align-items:center}
 .un .kind{grid-column:1/-1;font-style:normal;font-size:10.5px;color:var(--ink-2);margin:-1px 0 5px 2px}
 .un .kind.air{color:var(--violet)}
 .rb,.rbh{grid-template-columns:1fr 48px 60px 22px}.rb{margin-bottom:6px}
+.uh.bbh{grid-template-columns:1fr 96px 66px 44px 22px}
+.rbs-bb-wrap{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
 .add.sm{padding:5px;font-size:12.5px;margin-top:4px}
 
 body[data-mode="TRM"] .ran-only{display:none!important}
