@@ -28,7 +28,7 @@
 <header class="bar">
   <div class="seg" role="tablist" aria-label="Domain"><button role="tab" data-mode="RAN">RAN</button><button role="tab" data-mode="TRM">TRM</button></div>
   <div class="mast"><small id="mastSub">MOP generator · site installation</small>
-    <div class="titles"><input class="pname" id="pname" aria-label="Project name"><input class="pname cty" data-p="country" list="countries" aria-label="Country" placeholder="Country"></div></div>
+    <div class="titles"><input class="pname" id="pname" data-p="name" aria-label="Project name"><input class="pname cty" data-p="country" list="countries" aria-label="Country" placeholder="Country"></div></div>
   <datalist id="countries"><option>Lebanon</option><option>Egypt</option><option>Saudi Arabia</option><option>United Arab Emirates</option><option>Jordan</option><option>Oman</option><option>Qatar</option><option>Kuwait</option><option>Bahrain</option><option>Iraq</option><option>Palestine</option><option>Türkiye</option><option>South Africa</option><option>Angola</option><option>Zambia</option><option>Kenya</option><option>Nigeria</option><option>Morocco</option><option>Djibouti</option></datalist>
   <button class="ghost" id="exp" title="Save all inputs as a file to share with the team">Save setup</button>
   <label class="ghost" id="impl" title="Load a setup file">Load setup<input type="file" id="imp" accept=".json,application/json" hidden></label>
@@ -40,10 +40,9 @@
 <aside>
   <details class="sec" open><summary>Project &amp; country</summary><div class="body">
     <div class="grid2">
+      <label class="f">Project<input type="text" data-p="name" placeholder="Project name"></label>
       <label class="f">Country<input type="text" data-p="country" list="countries"></label>
-      <label class="f"><span class="lbl-id">Site ID prefix</span><input type="text" data-p="prefix" maxlength="8"></label>
-      <label class="f">Weekend<select data-p="weekend"><option value="sun">Sunday</option><option value="frisat">Friday + Saturday</option><option value="satsun">Saturday + Sunday</option><option value="fri">Friday only</option></select></label>
-      <label class="f">Regions (comma separated)<input type="text" data-p="regions" placeholder="e.g. North, South"></label>
+      <label class="f">Customer<input type="text" data-p="customer" placeholder="Customer name"></label>
     </div>
   </div></details>
   <details class="sec ran-only" open><summary>New RBS / cabinet</summary><div class="body">
