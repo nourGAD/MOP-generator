@@ -26,7 +26,7 @@
   const D0_DEFAULT_TXT = "SID with site-specific connection diagram, MR for the site, RFI confirmation, site access\nMaterial collection booked (48 h before); discrepancies vs SID / MR reported to IM\nBB serial shared for script generation; scripts uploaded (ESI / ZTI) and checked by TL\nSRS data loaded on SRS server\nWhatsApp / Teams group with all stakeholders\nApproved CR available at least 1 day before";
   const DEFAULT_STATE = () => ({
     domain: "RAN",
-    project: { name: "Swap & Modernization", country: "Lebanon", prefix: "LB", arrive: "07:00", maxHours: 11,
+    project: { name: "Swap & Modernization", country: "Lebanon", customer: "", prefix: "LB", arrive: "07:00", maxHours: 11,
       daysPerSite: 2, outStart: "08:00", outMax: 4, startDate: "2026-10-05", teams: 3, sectors: 3, legacyRRU: 6, weekend: "sun", regions: "" },
     basebands: [
       { model: "RP6655", status: "New", tech: "4G+5G", qty: 1 },
@@ -498,7 +498,7 @@
     : /\b(idu|npu|mmu|optix|odf)\b|ml ?66\d\d|669\d/i.test(`${u.role} ${u.model}`) ? "idu" : "rad";
   const DEFAULT_TRM = () => ({
     domain: "TRM", d0: "Correct LB design available; laptop ready (min 4 GB RAM)\nApproved CR available at least 1 day before site activities\nNo move to site without customer RFI confirmation and SID / TSSR / LB\nOutage plan shared with expected migration date",
-    project: { name: "MW Link Modernization", country: "Libya", prefix: "LNK", arrive: "09:00", maxHours: 10, daysPerSite: 4, outStart: "11:30", outMax: 6.5,
+    project: { name: "MW Link Modernization", country: "Libya", customer: "", prefix: "LNK", arrive: "09:00", maxHours: 10, daysPerSite: 4, outStart: "11:30", outMax: 6.5,
       startDate: "2026-10-05", teams: 2, sectors: 3, legacyRRU: 0, weekend: "frisat", regions: "" },
     equipment: [
       { model: "Antenna 0.6m HPX", kind: "radio", min: 45 }, { model: "Antenna 0.9m HPX", kind: "radio", min: 60 },

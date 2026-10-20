@@ -18,7 +18,6 @@ function applyMode(){
   $("#mastSub").textContent=TRMm()?"MOP generator · TRM – MW link installation":"MOP generator · RAN site installation";
   $("#typesTitle").textContent=TRMm()?"Link types & equipment":"Site types & equipment";
   $("#listTitle").textContent=TRMm()?"Link list (optional)":"Site list (optional)";
-  document.querySelector(".lbl-id").textContent=TRMm()?"Link ID prefix":"Site ID prefix";
   $("#sites").placeholder=TRMm()?"LNK-001, TRP-101, TRP-205, SC-1 Antenna swap + RAU, Tripoli":"LB-001, Type-1, Beirut\nLB-002, Type-2, Mount Lebanon";
   $("#roles").innerHTML=(TRMm()?["Antenna","Antenna main","Antenna SD","Radio","IDU","MMU"]:["Low band","Mid band","High band","5G AIR","Extra RRU"]).map(v=>`<option value="${v}">`).join("");
 }
@@ -102,7 +101,7 @@ function render(){
   const plan=M.planDates(S,sites,dBy,cBy), end=sites.length?new Date(Math.max(...plan.map(x=>x.end.getTime()))):new Date(S.project.startDate+"T00:00:00Z");
   const uDays=sites.reduce((a,x)=>a+(dBy[x.type]||0),0);
   const unknown=sites.filter(s=>!S.types.some(t=>t.name===s.type)).length;
-  $("#totals").innerHTML=`<span><b>${esc(S.project.country||"—")}</b></span><span><b>${sites.length}</b> ${W1()}s</span><span><b>${uDays}</b> ${W1()}-days</span><span>Finish <b>${end.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"})}</b> with ${teams} team${teams>1?"s":""} · ${esc((M.WEEKEND[S.project.weekend]||M.WEEKEND.sun).label)}</span>${unknown?`<span style="color:var(--red)">${unknown} ${W1()}(s) in the list use an unknown type</span>`:""}`;
+  $("#totals").innerHTML=`${S.project.customer?`<span><b>${esc(S.project.customer)}</b></span>`:""}${S.project.country?`<span><b>${esc(S.project.country)}</b></span>`:""}<span><b>${sites.length}</b> ${W1()}s</span><span><b>${uDays}</b> ${W1()}-days</span>${unknown?`<span style="color:var(--red)">${unknown} ${W1()}(s) in the list use an unknown type</span>`:""}`;
   // timeline
   const t=S.types[sel], r=sch[sel]; if(!t){$("#tl").innerHTML="<p>Add a type to start.</p>";return}
   const span=Math.max(mx,...r.days.map(d=>d.hours),...r.days.filter(d=>d.cut).map(d=>r.allowedEnd-d.arrive)); const step=60, W=span;
@@ -147,9 +146,9 @@ function render(){
 // events
 document.addEventListener("input",e=>{
   const el=e.target, v=(el.type==="number"||el.dataset.num)?(el.value===""?0:+el.value):el.type==="checkbox"?el.checked:el.value;
-  if(el.id==="pname") S.project.name=v;
-  else if(el.dataset.p){ S.project[el.dataset.p]=v; document.querySelectorAll(`[data-p="${el.dataset.p}"]`).forEach(o=>{if(o!==el)o.value=v});
+  if(el.dataset.p){ S.project[el.dataset.p]=v; document.querySelectorAll(`[data-p="${el.dataset.p}"]`).forEach(o=>{if(o!==el)o.value=v});
     updCut(); }
+  else if(el.id==="pname") S.project.name=v;
   else if(el.dataset.bb){const i=+el.closest(".bb").dataset.b; S.basebands[i][el.dataset.bb]=v}
   else if(el.dataset.u) S.unit[el.dataset.u]=v;
   else if(el.dataset.f){ S.fixed[el.dataset.f]=v; updCut(); }
