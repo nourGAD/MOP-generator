@@ -123,6 +123,8 @@
       if (!Array.isArray(t.rbs)) t.rbs = legacyRBS ? legacyRBS.map(r => Object.assign({}, r)) : [];
       if (!Array.isArray(t.basebands)) t.basebands = legacyBB ? legacyBB.map(b => Object.assign({}, b)) : DEF_BASEBANDS();
       if (!t.towerType) t.towerType="Monopole"; if (!t.towerHeight) t.towerHeight=30; if (!RAN_SCEN[t.scenario]) t.scenario = "swap"; if (!RAN_SCEN[t.scenario].days.includes(+t.days)) t.days = t.scenario === "swap" && [2, 3, 4].includes(+s.project.daysPerSite) ? +s.project.daysPerSite : RAN_SCEN[t.scenario].def;
+      if (t.outageDay === undefined || t.outageDay === null) t.outageDay = s.project.outageDay !== undefined ? +s.project.outageDay : 2;
+      if (+t.outageDay !== 0) t.outageDay = Math.min(+t.days, Math.max(1, +t.outageDay));
       if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, add: [] };
     });
     return s;
@@ -134,10 +136,11 @@
   };
   const wk = P => WEEKEND[P.weekend] || WEEKEND.sun;
   const daysOf = P => ([2, 3, 4].includes(+P.daysPerSite) ? +P.daysPerSite : 2);
-  const cutDayOf = (P, D) => {
+  const cutDayOf = (P, D, t) => {
     const d = D || daysOf(P);
-    if (+P.outageDay === 0) return 0;
-    return Math.min(d, Math.max(d === 4 ? 3 : 2, +(P.outageDay || (d === 4 ? 3 : 2))));
+    const outDay = (t && t.outageDay !== undefined) ? t.outageDay : P.outageDay;
+    if (+outDay === 0) return 0;
+    return Math.min(d, Math.max(1, +(outDay || d)));
   };
   // team arrives on cutover day just in time for the approved outage start
   const leadMin = S => { const F = S.fixed; return (+F.accessN || 0) + (+F.safetyN || 0) + Math.max(+F.riggingN || 0, +F.precut || 0) + (+F.gng || 0); };
@@ -174,9 +177,8 @@
 
   function activities(state, t, Dsel) {
     const F = state.fixed, U = state.unit, P = state.project, D = Dsel || daysOf(P);
-    // CUT: which physical day number is the cutover. Clamp so it can't clash with fixed days
-    // (Day 2 is AIR-install day on 4-day plans, so CUT must be ≥ 3 then; otherwise ≥ 2)
-    const CUT = +(P.outageDay) === 0 ? 0 : Math.min(D, Math.max(D === 4 ? 3 : 2, +(P.outageDay || (D === 4 ? 3 : 2))));
+    // CUT: which physical day number is the cutover (per type). 0 = no outage.
+    const CUT = +(t.outageDay) === 0 ? 0 : Math.min(D, Math.max(1, +(t.outageDay || D)));
     const RAD = radiosOf(t), AIRS = airsOf(t);
     const nr = sumQ(RAD), na = sumQ(AIRS);
     const radTxt = listTxt(RAD, true) || "radios";
@@ -221,8 +223,9 @@
       reuse ? "SKIPPED – existing cabling reused" : "⭐ PRIORITY – needed for cutover. AIR cabling can run in parallel (same route, install once). Skip if existing cabling is reused"));
     d1.push(...bbTrack());
     d1.push(A("powRad", "Power up radios", `Connect radio DC & fiber at ${NEW} side, power up, no HW alarms. Cells LOCKED`, "FE + Ground tech", F.powerRadios, ["radCab", "tn"], "", "Never unlock before jumpers connected"));
-    d1.push(A("close", "Close day", "Secure cables, photos, inform NOC leaving site", "All", F.closeDay, ["powRad"]));
-    const days = [{ title: `🔧 DAY 1 – INSTALLATION: ${NEW} + RADIOS${D !== 4 ? " + 5G AIRs" : ""} (no impact)`, acts: d1 }];
+    // If CUT===1, don't close Day 1 – we'll append cutover acts directly to d1
+    if (CUT !== 1) d1.push(A("close", "Close day", "Secure cables, photos, inform NOC leaving site", "All", F.closeDay, ["powRad"]));
+    const days = CUT !== 1 ? [{ title: `🔧 DAY 1 – INSTALLATION: ${NEW} + RADIOS${D !== 4 ? " + 5G AIRs" : ""} (no impact)`, acts: d1 }] : [];
     // ---- Day 2 for 4-day plan: AIRs
     if (D === 4) {
       const d = startN("");
@@ -249,10 +252,13 @@
     }
     // ---- Cutover day
     const finishHere = CUT >= D;
-    const c = startN("; confirm approved outage window");
-    c.push(A("rig", "Rigging", "Rope & pulley ready for jumper swap" + (D !== 4 ? " + AIR cabling" : ""), "Tower crew", Math.round((F.riggingN||15)*_rf), ["safety"]));
-    c.push(A("precut", "Pre-cutover check", "Alarm/KPI snapshot & old config backup (remote); FE test calls on site", "Remote integrator + FE", F.precut, ["safety"], "", "Remote, parallel with field"));
-    c.push(A("gng", "GO / NO-GO", "Previous-day work OK, integrator & NOC online; approval to start outage", "Team lead + Remote integrator", F.gng, ["rig", "precut"], "", "Any issue = postpone"));
+    // CUT===1: reuse d1 (install already done), append outage acts directly; no dup access/safety
+    const c = CUT === 1 ? d1 : startN("; confirm approved outage window");
+    if (CUT !== 1) c.push(A("rig", "Rigging", "Rope & pulley ready for jumper swap" + (D !== 4 ? " + AIR cabling" : ""), "Tower crew", Math.round((F.riggingN||15)*_rf), ["safety"]));
+    const preAfter = CUT === 1 ? ["powRad"] : ["safety"];
+    const gngAfter = CUT === 1 ? ["powRad", "precut"] : ["rig", "precut"];
+    c.push(A("precut", "Pre-cutover check", "Alarm/KPI snapshot & old config backup (remote); FE test calls on site", "Remote integrator + FE", F.precut, preAfter, "", "Remote, parallel with field"));
+    c.push(A("gng", "GO / NO-GO", "Previous-day work OK, integrator & NOC online; approval to start outage", "Team lead + Remote integrator", F.gng, gngAfter, "", "Any issue = postpone"));
     c.push(A("off", "Power off old equipment", "Lock cells (remote), power off old RRUs & old baseband (site)", "Remote integrator + FE", F.powerOff, ["gng"], "Outage",
       "🔴 OUTAGE STARTS – not before approved outage start", { atOutage: true }));
     c.push(A("jump", "Jumper swap", "Per sector: old RRU jumpers off, new radio jumpers to antennas, torque + weatherproof", "Tower crew", (+P.sectors || 3) * U.jumperSector, ["off"], "Outage", "Keep old RRUs mounted (rollback)"));
@@ -285,7 +291,10 @@
     };
     if (finishHere) finishing(c, "dism");
     else c.push(A("close", "Close day", "Housekeeping, photos, inform NOC", "All", F.closeDay, ["svc", "dism", "dismBB"]));
-    days.push({ title: `⚡ DAY ${CUT} – CUTOVER + 5G (remote, parallel) + DISMANTLE${finishHere ? " + QA / RSC" : ""}`, acts: c, cut: true });
+    const cutTitle = CUT === 1
+      ? `⚡ DAY 1 – INSTALLATION + CUTOVER + 5G (remote, parallel) + DISMANTLE${finishHere ? " + QA / RSC" : ""}`
+      : `⚡ DAY ${CUT} – CUTOVER + 5G (remote, parallel) + DISMANTLE${finishHere ? " + QA / RSC" : ""}`;
+    days.push({ title: cutTitle, acts: c, cut: true });
     if (!finishHere) {
       const f = startN(""); finishing(f, "safety");
       f.forEach(a => { if (["dress", "kpi", "pack", "rsc", "snags"].includes(a.key)) { a.group = "fin"; a.allow = [CUT, D]; } });
@@ -316,7 +325,7 @@
     const D = S.days.includes(+t.days) ? +t.days : S.def;
     if (sc === "swap") {
       const days = activities(state, t, D);
-      if (+state.project.outageDay === 0) {
+      if (+t.outageDay === 0) {
         days.forEach(d => {
           d.cut = false;
           d.title = d.title.replace(/⚡ DAY (\d+) – CUTOVER[^\n]*/, "DAY $1 – SITE ACTIVITIES");
