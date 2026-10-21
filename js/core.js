@@ -210,7 +210,7 @@
       (+r.qty || 0) * (+r.min || 0), [i ? "rbs" + (i - 1) : "material"], "", "New RBS – before baseband installation"));
     // GSM antenna helper – call after "rig" is in the list; returns last key or null
     const addGsmAnts = (L) => {
-      const ants = (t.gsmAnts || []).filter(a => a.name && +a.qty > 0);
+      const ants = (t.gsmAnts || []).filter(a => +a.qty > 0);
       if (!ants.length) return null;
       let prev = "rig";
       ants.forEach((ant, idx) => {
@@ -366,7 +366,7 @@
     const TW = "Tower crew", GT = "Ground tech", RI = "Remote integrator";
     // GSM antenna helper – call after tower() so "rig" is already in list; returns last key or null
     const addGsmAnts = (L) => {
-      const ants = (t.gsmAnts || []).filter(a => a.name && +a.qty > 0);
+      const ants = (t.gsmAnts || []).filter(a => +a.qty > 0);
       if (!ants.length) return null;
       let prev = "rig";
       ants.forEach((ant, idx) => {

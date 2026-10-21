@@ -70,10 +70,10 @@ function renderInputs(){
       <button class="add sm" data-badd="${i}">+ Add baseband</button>
     </div>`:""}
     ${!TRMm()?`<div class="gsm-wrap">
-      ${(t.gsmAnts||[]).length?`<div class="uh gsmh"><span>GSM antenna · band</span><span>Mode</span><span>Qty</span><span>Min/inst</span><span>Min/dismantle</span><span></span></div>`:""}
+      ${(t.gsmAnts||[]).length?`<div class="uh gsmh"><span>GSM antenna</span><span>Port / type</span><span>Mode</span><span>Qty</span><span>Min/inst</span><span>Min/dismantle</span><span></span></div>`:""}
       ${(t.gsmAnts||[]).map((g,k)=>`<div class="gsm" data-g="${k}">
         <input type="text" data-ga="name" value="${esc(g.name||"")}" placeholder="e.g. Cross-dipole 900">
-        <input type="text" data-ga="band" value="${esc(g.band||"")}" placeholder="Band">
+        <input type="text" data-ga="band" value="${esc(g.band||"")}" placeholder="Port / type">
         <select data-ga="mode"><option value="new" ${g.mode!=="swap"?"selected":""}>New install</option><option value="swap" ${g.mode==="swap"?"selected":""}>Swap</option></select>
         <input type="number" min="1" max="9" data-ga="qty" value="${g.qty||1}">
         <input type="number" min="0" data-ga="minInstall" value="${g.minInstall||30}">
