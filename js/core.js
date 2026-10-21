@@ -125,6 +125,7 @@
       if (!t.towerType) t.towerType="Monopole"; if (!t.towerHeight) t.towerHeight=30; if (!RAN_SCEN[t.scenario]) t.scenario = "swap"; if (!RAN_SCEN[t.scenario].days.includes(+t.days)) t.days = t.scenario === "swap" && [2, 3, 4].includes(+s.project.daysPerSite) ? +s.project.daysPerSite : RAN_SCEN[t.scenario].def;
       if (t.outageDay === undefined || t.outageDay === null) t.outageDay = s.project.outageDay !== undefined ? +s.project.outageDay : 2;
       if (+t.outageDay !== 0) t.outageDay = Math.min(+t.days, Math.max(1, +t.outageDay));
+      if (t.scenario === "exp" && +t.outageDay === 0) t.outageDay = +t.days;
       if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, add: [] };
     });
     return s;
@@ -257,8 +258,8 @@
     if (CUT !== 1) c.push(A("rig", "Rigging", "Rope & pulley ready for jumper swap" + (D !== 4 ? " + AIR cabling" : ""), "Tower crew", Math.round((F.riggingN||15)*_rf), ["safety"]));
     const preAfter = CUT === 1 ? ["powRad"] : ["safety"];
     const gngAfter = CUT === 1 ? ["powRad", "precut"] : ["rig", "precut"];
-    c.push(A("precut", "Pre-cutover check", "Alarm/KPI snapshot & old config backup (remote); FE test calls on site", "Remote integrator + FE", F.precut, preAfter, "", "Remote, parallel with field"));
-    c.push(A("gng", "GO / NO-GO", "Previous-day work OK, integrator & NOC online; approval to start outage", "Team lead + Remote integrator", F.gng, gngAfter, "", "Any issue = postpone"));
+    c.push(A("precut", "Pre-cutover check", "Alarm/KPI snapshot & old config backup (remote); FE test calls on site", "Remote integrator + FE", F.precut, preAfter, "", "Remote, parallel with field", CUT === 1 ? { atOutage: true } : {}));
+    c.push(A("gng", "GO / NO-GO", "Previous-day work OK, integrator & NOC online; approval to start outage", "Team lead + Remote integrator", F.gng, gngAfter, "", "Any issue = postpone", CUT === 1 ? { atOutage: true } : {}));
     c.push(A("off", "Power off old equipment", "Lock cells (remote), power off old RRUs & old baseband (site)", "Remote integrator + FE", F.powerOff, ["gng"], "Outage",
       "🔴 OUTAGE STARTS – not before approved outage start", { atOutage: true }));
     c.push(A("jump", "Jumper swap", "Per sector: old RRU jumpers off, new radio jumpers to antennas, torque + weatherproof", "Tower crew", (+P.sectors || 3) * U.jumperSector, ["off"], "Outage", "Keep old RRUs mounted (rollback)"));
@@ -294,7 +295,7 @@
     const cutTitle = CUT === 1
       ? `⚡ DAY 1 – INSTALLATION + CUTOVER + 5G (remote, parallel) + DISMANTLE${finishHere ? " + QA / RSC" : ""}`
       : `⚡ DAY ${CUT} – CUTOVER + 5G (remote, parallel) + DISMANTLE${finishHere ? " + QA / RSC" : ""}`;
-    days.push({ title: cutTitle, acts: c, cut: true });
+    days.push({ title: cutTitle, acts: c, cut: true, ...(CUT === 1 ? { installDay: true } : {}) });
     if (!finishHere) {
       const f = startN(""); finishing(f, "safety");
       f.forEach(a => { if (["dress", "kpi", "pack", "rsc", "snags"].includes(a.key)) { a.group = "fin"; a.allow = [CUT, D]; } });
@@ -394,10 +395,10 @@
       else { endDay(d1, ["srs", "phys"], false); days.push({ title: "📡 DAY 1 – 5G AIR INSTALLATION & INTEGRATION (no outage)", acts: d1 });
         const d2 = start(false); qa(d2, "ehs", true, [1, 2]); days.push({ title: "✅ DAY 2 – SEALING, SYSTEMIZATION & QA", acts: d2 }); }
     } else if (sc === "exp") {
+      const EXP_CUT = Math.min(D, Math.max(1, +(t.outageDay || D)));
       const d1 = start(true); const bb = bbTrack(d1, "material"); const tw = tower(d1, "material", true, true);
-      const outDay = D === 1 ? d1 : null;
-      const cut = (L, pre) => {
-        L.push(A("gng", "GO / NO-GO", "Pre-checks done, integrator & NOC online; approval to start outage", "Team lead + " + RI, F.gng, pre));
+      const cut = (L, pre, sameDay) => {
+        L.push(A("gng", "GO / NO-GO", "Pre-checks done, integrator & NOC online; approval to start outage", "Team lead + " + RI, F.gng, pre, "", "", sameDay ? { atOutage: true } : {}));
         L.push(A("off", "Start outage – lock affected cells", "Lock affected cells (remote) before connecting new units", RI + " + FE", F.powerOff, ["gng"], "Outage", "🔴 OUTAGE STARTS – not before approved start", { atOutage: true }));
         L.push(A("connect", "Connect new units / re-home", "Connect new radios / BB, TN changes as per SID", GT + " + FE", F.connect, ["off"], "Outage"));
         L.push(A("integ", "Integration", "Activate new units and unlock cells", RI, F.integExp, ["connect"], "Outage", "Remote"));
@@ -406,9 +407,20 @@
         L.push(A("srs", "SRS testing", "SRS test – sectors & technologies working", "Team lead", F.srs, ["alarm"]));
         L.push(A("phys", "Physical parameters", "Set azimuth & mechanical tilt", "Tower crew + " + GT, F.phys, ["onair"]));
       };
-      if (D === 1) { cut(d1, [tw, bb]); qa(d1, "onair", true); days.push({ title: "🔧 DAY 1 – EXPANSION: INSTALL, SHORT OUTAGE & QA", acts: d1, cut: true }); }
-      else { endDay(d1, [tw, bb], false); days.push({ title: "🔧 DAY 1 – EXPANSION INSTALLATION (no impact)", acts: d1 });
-        const d2 = start(false); cut(d2, ["ehs"]); qa(d2, "phys", true); days.push({ title: "⚡ DAY 2 – CONNECT (short outage), TESTS & QA", acts: d2, cut: true }); }
+      if (D === 1) {
+        cut(d1, [tw, bb], true); qa(d1, "onair", true);
+        days.push({ title: "🔧 DAY 1 – EXPANSION: INSTALL, SHORT OUTAGE & QA", acts: d1, cut: true, installDay: true });
+      } else if (EXP_CUT === 1) {
+        // Outage on Day 1: install + outage + tests; Day 2: QA only
+        cut(d1, [tw, bb], true); endDay(d1, ["phys", "srs"], false);
+        days.push({ title: "⚡ DAY 1 – EXPANSION: INSTALL, SHORT OUTAGE & TESTS", acts: d1, cut: true, installDay: true });
+        const d2 = start(false); qa(d2, "ehs", true, [1, 2]);
+        days.push({ title: "✅ DAY 2 – SEALING, SYSTEMIZATION & QA", acts: d2 });
+      } else {
+        endDay(d1, [tw, bb], false); days.push({ title: "🔧 DAY 1 – EXPANSION INSTALLATION (no impact)", acts: d1 });
+        const d2 = start(false); cut(d2, ["ehs"], false); qa(d2, "phys", true);
+        days.push({ title: "⚡ DAY 2 – CONNECT (short outage), TESTS & QA", acts: d2, cut: true });
+      }
     } else {
       const d1 = start(true); const bb = bbTrack(d1, "material"); const tw = tower(d1, "material", true, D === 2);
       endDay(d1, [tw, bb], false); days.push({ title: "🏗 DAY 1 – NEW SITE: ENCLOSURE, BB & HARDWARE", acts: d1 });
@@ -848,6 +860,8 @@
     const days = TRM ? trmActivities(state, t) : finalize(state, t, ranBuild(state, t));
     days.forEach(d => {
       if (!d.cut) { d.arrive = hm(P.arrive); return; }
+      // install+cutover same day: team arrives at normal time; outage activities anchor to approved window
+      if (d.installDay) { d.arrive = hm(P.arrive); d.lateArrive = true; d.lead = 0; return; }
       // team arrives just in time: approved outage start minus the preparation chain before the outage
       d.acts.forEach(a => { a.start = a.afterIdx.length ? Math.max(...a.afterIdx.map(k => d.acts[k - 1].end)) : 0; a.end = a.start + a.dur; });
       const first = d.acts.find(a => a.atOutage); d.lead = first ? first.start : 0;
