@@ -69,6 +69,18 @@ function renderInputs(){
         <button class="x" data-bdel="${k}" aria-label="Remove baseband">×</button></div>`).join("")}
       <button class="add sm" data-badd="${i}">+ Add baseband</button>
     </div>`:""}
+    ${!TRMm()?`<div class="gsm-wrap">
+      ${(t.gsmAnts||[]).length?`<div class="uh gsmh"><span>GSM antenna · band</span><span>Mode</span><span>Qty</span><span>Min/inst</span><span>Min/dismantle</span><span></span></div>`:""}
+      ${(t.gsmAnts||[]).map((g,k)=>`<div class="gsm" data-g="${k}">
+        <input type="text" data-ga="name" value="${esc(g.name||"")}" placeholder="e.g. Cross-dipole 900">
+        <input type="text" data-ga="band" value="${esc(g.band||"")}" placeholder="Band">
+        <select data-ga="mode"><option value="new" ${g.mode!=="swap"?"selected":""}>New install</option><option value="swap" ${g.mode==="swap"?"selected":""}>Swap</option></select>
+        <input type="number" min="1" max="9" data-ga="qty" value="${g.qty||1}">
+        <input type="number" min="0" data-ga="minInstall" value="${g.minInstall||30}">
+        <input type="number" min="0" data-ga="minDismantle" value="${g.minDismantle||20}" class="${g.mode!=="swap"?"gsm-hide":""}">
+        <button class="x" data-gdel="${k}" aria-label="Remove GSM antenna">×</button></div>`).join("")}
+      <button class="add sm" data-gadd="${i}">+ Add GSM antenna</button>
+    </div>`:""}
     <div class="uh"><span>${TRMm()?"Part · model (per link end)":"Part / band · model"}</span><span>Qty</span><span>Min/unit</span><span></span></div>
     ${(t.units||[]).map((u,k)=>`<div class="un" data-u="${k}">
       <input type="text" list="roles" data-uk="role" value="${esc(u.role)}" aria-label="Part or band" placeholder="e.g. Low band">
@@ -166,6 +178,7 @@ document.addEventListener("input",e=>{
     if(el.dataset.uk==="model"){const e=S.equipment.find(q=>q.model===v); if(e){u.min=+e.min; el.closest(".un").querySelector('[data-uk="min"]').value=u.min}}
     if(el.dataset.uk==="role"||el.dataset.uk==="model"){const ki=el.closest(".un").querySelector(".kind"), k2=kindOf(u); ki.textContent=k2.txt; ki.className="kind "+k2.cls} }
   else if(el.dataset.rb){const ti=+el.closest(".tcard").dataset.i; const ri=+el.closest(".rb").dataset.r; S.types[ti].rbs[ri][el.dataset.rb]=v}
+  else if(el.dataset.ga){const ti=+el.closest(".tcard").dataset.i; const gi=+el.closest(".gsm").dataset.g; S.types[ti].gsmAnts[gi][el.dataset.ga]=v; if(el.dataset.ga==="mode") renderInputs();}
   else if(el.dataset.t){const i=+el.closest(".tcard").dataset.i, tt=S.types[i]; tt[el.dataset.t]=v;
     if(["towerType","towerHeight"].includes(el.dataset.t)){
       const ci=+el.closest(".tcard").dataset.i; S.types[ci][el.dataset.t]=el.dataset.num?+el.value:el.value;
@@ -214,6 +227,8 @@ document.addEventListener("click",e=>{
   else if(b.dataset.bdel!==undefined){const ti=+b.closest(".tcard").dataset.i; S.types[ti].basebands.splice(+b.dataset.bdel,1);renderInputs();render()}
   else if(b.dataset.radd!==undefined){S.types[+b.dataset.radd].rbs.push({type:"",qty:1,min:90}); renderInputs(); render(); const x=document.querySelectorAll('[data-rb="type"]'); x[x.length-1].focus()}
   else if(b.dataset.badd!==undefined){S.types[+b.dataset.badd].basebands.push({model:"",status:"New",tech:"",qty:1}); renderInputs(); render(); const x=document.querySelectorAll('[data-bb="model"]'); x[x.length-1].focus()}
+  else if(b.dataset.gdel!==undefined){const ti=+b.closest(".tcard").dataset.i; S.types[ti].gsmAnts.splice(+b.dataset.gdel,1); renderInputs(); render()}
+  else if(b.dataset.gadd!==undefined){S.types[+b.dataset.gadd].gsmAnts.push({name:"",band:"",mode:"new",qty:1,minInstall:30,minDismantle:20}); renderInputs(); render(); const x=document.querySelectorAll('[data-ga="name"]'); x[x.length-1].focus()}
   else if(b.dataset.edel!==undefined){const m=S.equipment[+b.dataset.edel].model; /* models stay usable as free text */ S.equipment.splice(+b.dataset.edel,1);renderInputs();render()}
 });
 $("#addType").onclick=()=>{const l=S.types[S.types.length-1]; S.types.push(Object.assign({},JSON.parse(JSON.stringify(l)),{name:"Type-"+(S.types.length+1),sites:1})); sel=S.types.length-1; renderInputs(); render()};

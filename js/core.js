@@ -127,6 +127,7 @@
       if (+t.outageDay !== 0) t.outageDay = Math.min(+t.days, Math.max(1, +t.outageDay));
       if (t.scenario === "exp" && +t.outageDay === 0) t.outageDay = +t.days;
       if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, add: [] };
+      if (!Array.isArray(t.gsmAnts)) t.gsmAnts = [];
     });
     return s;
   }
@@ -207,6 +208,25 @@
       reuse ? "SKIPPED – existing cabling reused" : rem);
     const rbsActs = RBS.map((r, i) => A("rbs" + i, `Install ${r.type}`, `Install ${r.qty}x ${r.type} (RBS / cabinet) on plinth or wall; grounding, DC feed, cable entry`, "Ground tech",
       (+r.qty || 0) * (+r.min || 0), [i ? "rbs" + (i - 1) : "material"], "", "New RBS – before baseband installation"));
+    // GSM antenna helper – call after "rig" is in the list; returns last key or null
+    const addGsmAnts = (L) => {
+      const ants = (t.gsmAnts || []).filter(a => a.name && +a.qty > 0);
+      if (!ants.length) return null;
+      let prev = "rig";
+      ants.forEach((ant, idx) => {
+        const nm = ant.name || "GSM antenna", bd = ant.band ? ` (${ant.band})` : "";
+        const instKey = `gsma${idx}`;
+        if (ant.mode === "swap") {
+          const dismKey = `gsmd${idx}`;
+          L.push(A(dismKey, `Remove old ${nm}${bd}`, `Dismantle old ${nm}, store safely for disposal`, "Tower crew", Math.max(0, Math.round(+ant.minDismantle * (+ant.qty || 1))), [prev]));
+          L.push(A(instKey, `Install new ${nm}${bd}`, `Install new ${nm}, connect feeder, torque & weatherproof`, "Tower crew", Math.max(0, Math.round(+ant.minInstall * (+ant.qty || 1))), [dismKey]));
+        } else {
+          L.push(A(instKey, `Install ${nm}${bd}`, `Install ${nm}, connect feeder, torque & weatherproof`, "Tower crew", Math.max(0, Math.round(+ant.minInstall * (+ant.qty || 1))), [prev]));
+        }
+        prev = instKey;
+      });
+      return prev === "rig" ? null : prev;
+    };
     const bbTrack = () => [
       ...rbsActs,
       A("bbInst", `Install ${NEW}`, `Mount new baseband(s) in ${RBS.length ? RBS.map(r => r.type).join(" / ") : "rack/enclosure"} + grounding${OLD ? ` (${OLD} stays)` : ""}`, "Ground tech", F.bbInstall * newN, [RBS.length ? "rbs" + (RBS.length - 1) : "material"], "", newN ? "Parallel with tower work" : "SKIPPED – no new baseband"),
@@ -222,10 +242,11 @@
     if (D !== 4) { d1.push(airInstall("radios")); lastTower = "airs"; }
     d1.push(A("radCab", "Radio cabling", `Run & fix DC + fiber for ${nr} radios to ${NEW}; ground kits; weatherproof; labels`, "Tower crew", reuse ? 0 : Math.round(nr * U.cableRadio * _cf), [lastTower], "",
       reuse ? "SKIPPED – existing cabling reused" : "⭐ PRIORITY – needed for cutover. AIR cabling can run in parallel (same route, install once). Skip if existing cabling is reused"));
+    const gsmLast = addGsmAnts(d1); // GSM antenna work runs in parallel after rigging
     d1.push(...bbTrack());
     d1.push(A("powRad", "Power up radios", `Connect radio DC & fiber at ${NEW} side, power up, no HW alarms. Cells LOCKED`, "FE + Ground tech", F.powerRadios, ["radCab", "tn"], "", "Never unlock before jumpers connected"));
     // If CUT===1, don't close Day 1 – we'll append cutover acts directly to d1
-    if (CUT !== 1) d1.push(A("close", "Close day", "Secure cables, photos, inform NOC leaving site", "All", F.closeDay, ["powRad"]));
+    if (CUT !== 1) d1.push(A("close", "Close day", "Secure cables, photos, inform NOC leaving site", "All", F.closeDay, gsmLast ? ["powRad", gsmLast] : ["powRad"]));
     const days = CUT !== 1 ? [{ title: `🔧 DAY 1 – INSTALLATION: ${NEW} + RADIOS${D !== 4 ? " + 5G AIRs" : ""} (no impact)`, acts: d1 }] : [];
     // ---- Day 2 for 4-day plan: AIRs
     if (D === 4) {
@@ -271,6 +292,7 @@
     c.push(A("onair", "Cells on air", "NOC confirms all cells on air", "NOC + Remote integrator", F.onair, ["rf"], "Outage", "🟢 OUTAGE ENDS when this is done – rollback if not OK"));
     let testAfter = "onair";
     const dismAfter = ["onair"];
+    if (CUT === 1 && gsmLast) dismAfter.push(gsmLast);
     if (D !== 4) {
       c.push(airCab(["jump"], "Tower crew free during integration / only if not done on Day 1 (skip if already done or cabling reused)"));
       c.push(A("powAir", "Power up AIRs", `Connect AIR DC & fiber at ${NEW}, power up, no HW alarms`, "Ground tech", F.powerAir, ["airCab"]));
@@ -342,6 +364,25 @@
     const RBS = (t.rbs || []).filter(r => r.type && +r.qty > 0);
     const A = (key, name, desc, who, dur, after, impact, rem, extra) => Object.assign({ key, name, desc, who, dur: Math.max(0, Math.round(+dur || 0)), after: after || [], impact: impact || "Non-SA", rem: rem || "" }, extra || {});
     const TW = "Tower crew", GT = "Ground tech", RI = "Remote integrator";
+    // GSM antenna helper – call after tower() so "rig" is already in list; returns last key or null
+    const addGsmAnts = (L) => {
+      const ants = (t.gsmAnts || []).filter(a => a.name && +a.qty > 0);
+      if (!ants.length) return null;
+      let prev = "rig";
+      ants.forEach((ant, idx) => {
+        const nm = ant.name || "GSM antenna", bd = ant.band ? ` (${ant.band})` : "";
+        const instKey = `gsma${idx}`;
+        if (ant.mode === "swap") {
+          const dismKey = `gsmd${idx}`;
+          L.push(A(dismKey, `Remove old ${nm}${bd}`, `Dismantle old ${nm}, store safely for disposal`, TW, Math.max(0, Math.round(+ant.minDismantle * (+ant.qty || 1))), [prev]));
+          L.push(A(instKey, `Install new ${nm}${bd}`, `Install new ${nm}, connect feeder, torque & weatherproof`, TW, Math.max(0, Math.round(+ant.minInstall * (+ant.qty || 1))), [dismKey]));
+        } else {
+          L.push(A(instKey, `Install ${nm}${bd}`, `Install ${nm}, connect feeder, torque & weatherproof`, TW, Math.max(0, Math.round(+ant.minInstall * (+ant.qty || 1))), [prev]));
+        }
+        prev = instKey;
+      });
+      return prev === "rig" ? null : prev;
+    };
     const start = (first) => [
       A("access", "Site access & alarm pre-check", "Share site ID, request access and pre-checks with NOC; alarm log before starting", "Team lead", F.accessN || 15),
       A("safety", "EHS preparation", "Site file, EHS gear, barricade, PPE", "All", F.safetyN || 15, ["access"]),
@@ -387,16 +428,18 @@
     if (sc === "g5") {
       const d1 = start(true); let last = bbTrack(d1, "material");
       const tw = tower(d1, "material", false, true);
+      const gsmLast = addGsmAnts(d1);
       d1.push(A("int", "5G integration", "Integrator proceeds with 5G integration", RI, F.nrInteg, [tw, last], "", "🛰 Remote"));
       d1.push(A("phys", "Physical parameters", "Set azimuth & mechanical tilt", "Tower crew + " + GT, F.phys, [tw]));
       d1.push(A("alarm", "Alarm check", "Site diagnostics: alarms & status", RI, F.alarmChk, ["int"]));
       d1.push(A("srs", "SRS testing", "SRS test – sectors & technologies working", "Team lead", F.srs, ["alarm"]));
-      if (D === 1) { qa(d1, tw, true); days.push({ title: "📡 DAY 1 – 5G AIR INSTALLATION, INTEGRATION & QA (no outage)", acts: d1 }); }
-      else { endDay(d1, ["srs", "phys"], false); days.push({ title: "📡 DAY 1 – 5G AIR INSTALLATION & INTEGRATION (no outage)", acts: d1 });
+      if (D === 1) { qa(d1, gsmLast ? [tw, gsmLast] : tw, true); days.push({ title: "📡 DAY 1 – 5G AIR INSTALLATION, INTEGRATION & QA (no outage)", acts: d1 }); }
+      else { endDay(d1, gsmLast ? ["srs", "phys", gsmLast] : ["srs", "phys"], false); days.push({ title: "📡 DAY 1 – 5G AIR INSTALLATION & INTEGRATION (no outage)", acts: d1 });
         const d2 = start(false); qa(d2, "ehs", true, [1, 2]); days.push({ title: "✅ DAY 2 – SEALING, SYSTEMIZATION & QA", acts: d2 }); }
     } else if (sc === "exp") {
       const EXP_CUT = Math.min(D, Math.max(1, +(t.outageDay || D)));
       const d1 = start(true); const bb = bbTrack(d1, "material"); const tw = tower(d1, "material", true, true);
+      const gsmLast = addGsmAnts(d1);
       const cut = (L, pre, sameDay) => {
         L.push(A("gng", "GO / NO-GO", "Pre-checks done, integrator & NOC online; approval to start outage", "Team lead + " + RI, F.gng, pre, "", "", sameDay ? { atOutage: true } : {}));
         L.push(A("off", "Start outage – lock affected cells", "Lock affected cells (remote) before connecting new units", RI + " + FE", F.powerOff, ["gng"], "Outage", "🔴 OUTAGE STARTS – not before approved start", { atOutage: true }));
@@ -408,22 +451,23 @@
         L.push(A("phys", "Physical parameters", "Set azimuth & mechanical tilt", "Tower crew + " + GT, F.phys, ["onair"]));
       };
       if (D === 1) {
-        cut(d1, [tw, bb], true); qa(d1, "onair", true);
+        cut(d1, [tw, bb], true); qa(d1, gsmLast ? ["onair", gsmLast] : "onair", true);
         days.push({ title: "🔧 DAY 1 – EXPANSION: INSTALL, SHORT OUTAGE & QA", acts: d1, cut: true, installDay: true });
       } else if (EXP_CUT === 1) {
         // Outage on Day 1: install + outage + tests; Day 2: QA only
-        cut(d1, [tw, bb], true); endDay(d1, ["phys", "srs"], false);
+        cut(d1, [tw, bb], true); endDay(d1, gsmLast ? ["phys", "srs", gsmLast] : ["phys", "srs"], false);
         days.push({ title: "⚡ DAY 1 – EXPANSION: INSTALL, SHORT OUTAGE & TESTS", acts: d1, cut: true, installDay: true });
         const d2 = start(false); qa(d2, "ehs", true, [1, 2]);
         days.push({ title: "✅ DAY 2 – SEALING, SYSTEMIZATION & QA", acts: d2 });
       } else {
-        endDay(d1, [tw, bb], false); days.push({ title: "🔧 DAY 1 – EXPANSION INSTALLATION (no impact)", acts: d1 });
+        endDay(d1, gsmLast ? [tw, bb, gsmLast] : [tw, bb], false); days.push({ title: "🔧 DAY 1 – EXPANSION INSTALLATION (no impact)", acts: d1 });
         const d2 = start(false); cut(d2, ["ehs"], false); qa(d2, "phys", true);
         days.push({ title: "⚡ DAY 2 – CONNECT (short outage), TESTS & QA", acts: d2, cut: true });
       }
     } else {
       const d1 = start(true); const bb = bbTrack(d1, "material"); const tw = tower(d1, "material", true, D === 2);
-      endDay(d1, [tw, bb], false); days.push({ title: "🏗 DAY 1 – NEW SITE: ENCLOSURE, BB & HARDWARE", acts: d1 });
+      const gsmLast = addGsmAnts(d1);
+      endDay(d1, gsmLast ? [tw, bb, gsmLast] : [tw, bb], false); days.push({ title: "🏗 DAY 1 – NEW SITE: ENCLOSURE, BB & HARDWARE", acts: d1 });
       const d2 = start(false);
       if (D === 3 && na) { d2.push(A("rig2", "Rigging", "Tower climbing & rescue kit", TW, Math.round((F.riggingN||15)*_rf2), ["ehs"]));
         d2.push(A("airs", "Install 5G AIRs", `Install ${listTxt(AIRS, true)}`, TW, Math.round(sumMin(AIRS)*_tf2), ["rig2"])); }
