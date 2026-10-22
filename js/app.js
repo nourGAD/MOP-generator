@@ -133,11 +133,17 @@ function render(){
     const over=W>mx?`<div class="over" style="left:${mx/W*100}%;right:0"></div>`:"";
     const daySel=(a)=>nd>1?`<select class="mv" data-mv="${esc(a.id)}" aria-label="Move to day" title="Move to another day">${r.days.map((_,k)=>`<option value="${k+1}" ${k===di?"selected":""}>D${k+1}</option>`).join("")}</select>`:"";
     const tag=a=>a.custom?'<i class="tg add">added</i>':a.moved?'<i class="tg mvd">moved</i>':"";
+    const aofMap=(t.edits&&t.edits.afterOf)||{};
+    const timingSel=(a)=>{
+      const cur=aofMap[a.id]||"";
+      const opts=d.acts.filter(x=>x!==a&&x.key!=="eod"&&x.key!=="close"&&x.key!=="closeS");
+      return `<select class="atm" data-atm="${esc(a.id)}" title="Step timing"><option value="">⏱ auto</option><option value="~" ${cur==="~"?"selected":""}>⟂ day start</option>${opts.map(x=>`<option value="${esc(x.id)}" ${cur===x.id?"selected":""}>&darr; after ${esc(x.name.slice(0,20))}</option><option value="~${esc(x.id)}" ${cur==="~"+x.id?"selected":""}>&harr; with ${esc(x.name.slice(0,20))}</option>`).join("")}</select>`;
+    };
     return `<div class="day"><div class="dayhead"><b>${esc(d.title.replace(/^\S+\s/,""))}</b><span class="${bad?"bad":""}">${M.clock(d.arrive)} → ${M.clock(d.leave)} · ${M.fmt(d.hours)} h</span></div>
       <div class="scale"><span></span><div class="ticks">${ticks(d.arrive)}</div><span></span></div>
       ${d.acts.map((a,k)=>`<div class="lane ${a.dur?"":"skip"}"><div class="lb" title="${esc(a.name)} – ${esc(a.who)}${a.desc?"\n"+esc(a.desc):""}"><em>${di+1}.${k+1}</em>${esc(a.name)}${tag(a)}</div>
         <div class="track" style="--hr:${60/W*100}%">${ob}${over}${a.dur?`<div class="bar-a" style="--k:${colorOf(a)};left:${(a.start-d.arrive)/W*100}%;width:${a.dur/W*100}%" title="${M.clock(a.start)}–${M.clock(a.end)} · ${a.dur} min">${a.dur>=30?a.dur+"′":""}</div>`:""}</div>
-        <div class="ed">${daySel(a)}<input type="number" min="0" class="du" data-du="${esc(a.id)}" value="${a.dur}" aria-label="Minutes" title="Minutes"><button class="x" data-rm="${esc(a.id)}" aria-label="Remove ${esc(a.name)}" title="Remove step">×</button></div></div>`).join("")}
+        <div class="ed">${timingSel(a)}${daySel(a)}<input type="number" min="0" class="du" data-du="${esc(a.id)}" value="${a.dur}" aria-label="Minutes" title="Minutes"><button class="x" data-rm="${esc(a.id)}" aria-label="Remove ${esc(a.name)}" title="Remove step">×</button></div></div>`).join("")}
       <div class="addrow" data-day="${di+1}">
         <input type="text" list="stepLib" class="an" placeholder="+ Add step to Day ${di+1} (type or pick)" aria-label="New step name">
         <select class="aw2" aria-label="Who">${WHO.map(w=>`<option>${w}</option>`).join("")}</select>
@@ -191,10 +197,13 @@ document.addEventListener("input",e=>{
   render();
 });
 function curT(){return S.types[sel]}
-function edits(t){t.edits=t.edits||{};["rm","mv","dur"].forEach(k=>t.edits[k]=t.edits[k]||{});t.edits.add=t.edits.add||[];return t.edits}
+function edits(t){t.edits=t.edits||{};["rm","mv","dur","afterOf"].forEach(k=>t.edits[k]=t.edits[k]||{});t.edits.add=t.edits.add||[];return t.edits}
 document.addEventListener("change",e=>{
   const el=e.target, t=curT(); if(!t) return;
   if(el.classList.contains("bg")&&t){if(!t.balGroups)t.balGroups={};t.balGroups[el.dataset.gk]=el.checked;return}
+  if(el.dataset.atm){const id=el.dataset.atm, E=edits(t);
+    if(el.value==="") delete E.afterOf[id]; else E.afterOf[id]=el.value;
+    render(); return;}
   if(el.dataset.mv){const id=el.dataset.mv, E=edits(t), to=+el.value;
     if(id.startsWith("c:")){const c=E.add.find(x=>"c:"+x.id===id); if(c) c.day=to;}
     else { const orig=+id.split(":")[0]; if(to===orig) delete E.mv[id]; else E.mv[id]=to; }
@@ -215,8 +224,8 @@ document.addEventListener("click",e=>{
   if(b.id==="bal"&&t0){const before=M.schedule(S,t0).days.map(d=>M.fmt(d.hours)).join(" / ");
     const sel=new Set(document.querySelectorAll(".bg:checked").map?Array.from(document.querySelectorAll(".bg:checked")).map(c=>c.dataset.gk):[...document.querySelectorAll(".bg:checked")].map(c=>c.dataset.gk));
     t0.edits=M.autoBalanceGroups?M.autoBalanceGroups(S,t0,sel.size?sel:undefined):M.autoBalance(S,t0);
-    const after=M.schedule(S,t0).days.map(d=>M.fmt(d.hours)).join(" / "); render(); toast(before===after?"Already balanced – try enabling more groups.":`Balanced: ${before} → ${after}`); return}
-  if(b.id==="rst"&&t0){t0.edits={rm:{},mv:{},dur:{},add:[]}; render(); toast("Steps reset to the template."); return}
+    const after=M.schedule(S,t0).days.map(d=>M.fmt(d.hours)).join(" / "); render(); toast(before===after?"Already as balanced as possible.":`Balanced: ${before} → ${after}`); return}
+  if(b.id==="rst"&&t0){t0.edits={rm:{},mv:{},dur:{},afterOf:{},add:[]}; render(); toast("Steps reset to the template."); return}
   if(b.dataset.mode&&b.closest(".seg,.start")){ $("#start").hidden=true; if(b.dataset.mode!==ALL.mode) switchMode(b.dataset.mode); else save(); return }
   if(b.dataset.sel!==undefined){sel=+b.dataset.sel;render()}
   else if(b.dataset.del!==undefined){if(S.types.length<2){toast("Keep at least one type.");return} S.types.splice(+b.dataset.del,1);renderInputs();render()}

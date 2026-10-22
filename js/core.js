@@ -88,7 +88,7 @@
       s.project = Object.assign({}, DEFAULT_TRM().project, x.project || {});
       s.fixed = Object.assign({}, DEFAULT_TRM().fixed, x.fixed || {}); s.unit = Object.assign({}, DEFAULT_TRM().unit, x.unit || {});
       if (!Array.isArray(s.types) || !s.types.length) s.types = DEFAULT_TRM().types;
-      s.types.forEach(t => { if (!TRM_METHODS[t.method]) t.method = "normal"; if (!Array.isArray(t.units)) t.units = []; if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, add: [] }; });
+      s.types.forEach(t => { if (!TRM_METHODS[t.method]) t.method = "normal"; if (!Array.isArray(t.units)) t.units = []; if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, afterOf: {}, add: [] }; if (!t.edits.afterOf) t.edits.afterOf = {}; });
       if (typeof s.d0 !== "string") s.d0 = DEFAULT_TRM().d0;
       return s;
     }
@@ -126,7 +126,8 @@
       if (t.outageDay === undefined || t.outageDay === null) t.outageDay = s.project.outageDay !== undefined ? +s.project.outageDay : 2;
       if (+t.outageDay !== 0) t.outageDay = Math.min(+t.days, Math.max(1, +t.outageDay));
       if (t.scenario === "exp" && +t.outageDay === 0) t.outageDay = +t.days;
-      if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, add: [] };
+      if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, afterOf: {}, add: [] };
+      if (!t.edits.afterOf) t.edits.afterOf = {};
       if (!Array.isArray(t.gsmAnts)) t.gsmAnts = [];
     });
     return s;
@@ -537,6 +538,18 @@
       else insertBeforeLast(target,a);
       tailInto(target,a);
     });
+    // afterOf overrides: let user pin any step to run after or parallel with another
+    const aof = E.afterOf || {};
+    if (Object.keys(aof).length) {
+      const findAct = (d, id) => d.acts.find(x => x.id === id);
+      days.forEach(d => d.acts.forEach(a => {
+        const ov = aof[a.id]; if (!ov) return;
+        if (ov === "~") { a.after = anchor(d).slice(); return; }
+        const par = ov.startsWith("~"), tid = par ? ov.slice(1) : ov;
+        const targ = findAct(d, tid); if (!targ) return;
+        a.after = par ? targ.after.slice() : [targ.key];
+      }));
+    }
     return days;
   }
   function finalize(state, t, days) {
@@ -552,24 +565,58 @@
     const out = []; raw.forEach((d, i) => d.acts.forEach(a => { const id = `${i + 1}:${a.key}`; if ((t.edits && t.edits.rm || {})[id]) out.push({ id, name: a.name, day: i + 1 }); }));
     return out;
   }
-  // greedy balancing: move flexible steps to the day that keeps the longest day as short as possible
+  // greedy balancing: group-based first, then general tail-moving
   function autoBalance(state, t) {
     const base = JSON.parse(JSON.stringify(t.edits || {})); base.mv = base.mv || {};
     const tt = Object.assign({}, t, { edits: base });
     const r0 = schedule(state, tt); if (r0.days.length < 2) return base;
     const raw = state.domain === "TRM" ? trmActivities(state, t, true) : ranBuild(state, t);
+    const score = () => { const r = schedule(state, tt), h = r.days.map(d => d.hours); return Math.max(...h) * 1000 + (Math.max(...h) - Math.min(...h)); };
+    // 1. group-based (scenarios with pre-tagged blocks)
     const groups = [], gi = {};
     raw.forEach((d, i) => d.acts.forEach(a => { if (!a.group || !a.allow) return; const id = `${i + 1}:${a.key}`;
-      if (!gi[a.group]) { gi[a.group] = { name: a.group, ids: [], orig: i + 1, allow: a.allow }; groups.push(gi[a.group]); } gi[a.group].ids.push(id); }));
-    if (!groups.length) return base;
-    const setG = (g, k) => g.ids.forEach(id => { if (k === g.orig) delete base.mv[id]; else base.mv[id] = k; });
-    const score = () => { const r = schedule(state, tt), h = r.days.map(d => d.hours); return Math.max(...h) * 1000 + (Math.max(...h) - Math.min(...h)); };
-    groups.forEach(g => {
-      let best = g.orig, bestS = Infinity;
-      g.allow.forEach(k => { if (k < 1 || k > r0.days.length) return; setG(g, k); const s = score(); if (s < bestS - 0.001) { bestS = s; best = k; } });
-      setG(g, best);
-    });
+      if (!gi[a.group]) { gi[a.group] = { ids: [], orig: i + 1, allow: a.allow }; groups.push(gi[a.group]); } gi[a.group].ids.push(id); }));
+    if (groups.length) {
+      const setG = (g, k) => g.ids.forEach(id => { if (k === g.orig) delete base.mv[id]; else base.mv[id] = k; });
+      groups.forEach(g => { let best = g.orig, bestS = Infinity;
+        g.allow.forEach(k => { if (k < 1 || k > r0.days.length) return; setG(g, k); const s = score(); if (s < bestS - 0.001) { bestS = s; best = k; } });
+        setG(g, best); });
+    }
+    // 2. general tail-moving (works for all scenarios)
+    _tailBalance(state, tt, base, raw, score);
     return base;
+  }
+  // moves non-critical tail steps from the longest day toward shorter adjacent days
+  function _tailBalance(state, tt, base, raw, score) {
+    const ND = schedule(state, tt).days.length;
+    const ANCHORS = new Set(["ehs","safety","cehs","aehs","qehs","behs","access","cacc","aacc","eod","close","closeS","rfi","material"]);
+    const rm = base.rm || {};
+    const cands = [];
+    raw.forEach((d, i) => d.acts.forEach((a, j) => {
+      const id = `${i + 1}:${a.key}`;
+      if (ANCHORS.has(a.key) || a.impact === "Outage" || rm[id]) return;
+      cands.push({ id, origDay: i + 1, order: j });
+    }));
+    let improved = true, iter = 0;
+    while (improved && iter++ < 80) {
+      improved = false;
+      const h = schedule(state, tt).days.map(d => d.hours);
+      const maxH = Math.max(...h); if (maxH - Math.min(...h) < 1) break;
+      const maxDi = h.indexOf(maxH), dayN = maxDi + 1;
+      const targets = [maxDi + 1, maxDi - 1].filter(k => k >= 0 && k < ND);
+      const pool = cands
+        .filter(c => (base.mv[c.id] !== undefined ? base.mv[c.id] : c.origDay) === dayN)
+        .sort((a, b) => b.order - a.order);
+      for (const c of pool) {
+        const prevS = score(), was = base.mv[c.id]; let moved = false;
+        for (const ti of targets) {
+          base.mv[c.id] = ti + 1;
+          if (score() < prevS - 0.001) { improved = true; moved = true; break; }
+          if (was === undefined) delete base.mv[c.id]; else base.mv[c.id] = was;
+        }
+        if (moved) break;
+      }
+    }
   }
 
 
@@ -1332,13 +1379,15 @@
     const tt=Object.assign({},t,{edits:base}),r0=schedule(state,tt);
     if(r0.days.length<2)return base;
     const raw=state.domain==="TRM"?trmActivities(state,t,true):ranBuild(state,t);
+    const score=()=>{const r=schedule(state,tt),h=r.days.map(d=>d.hours);return Math.max(...h)*1000+(Math.max(...h)-Math.min(...h));};
     const groups=[],gi={};
     raw.forEach((d,i)=>d.acts.forEach(a=>{if(!a.group||!a.allow)return;if(enabledSet&&!enabledSet.has(a.group))return;
       const id=`${i+1}:${a.key}`;if(!gi[a.group]){gi[a.group]={ids:[],orig:i+1,allow:a.allow};groups.push(gi[a.group]);}gi[a.group].ids.push(id);}));
-    if(!groups.length)return base;
-    const setG=(g,k)=>g.ids.forEach(id=>{if(k===g.orig)delete base.mv[id];else base.mv[id]=k;});
-    const score=()=>{const r=schedule(state,tt),h=r.days.map(d=>d.hours);return Math.max(...h)*1000+(Math.max(...h)-Math.min(...h));};
-    groups.forEach(g=>{let best=g.orig,bestS=Infinity;g.allow.forEach(k=>{if(k<1||k>r0.days.length)return;setG(g,k);const s=score();if(s<bestS-0.001){bestS=s;best=k;}});setG(g,best);});
+    if(groups.length){
+      const setG=(g,k)=>g.ids.forEach(id=>{if(k===g.orig)delete base.mv[id];else base.mv[id]=k;});
+      groups.forEach(g=>{let best=g.orig,bestS=Infinity;g.allow.forEach(k=>{if(k<1||k>r0.days.length)return;setG(g,k);const s=score();if(s<bestS-0.001){bestS=s;best=k;}});setG(g,best);});
+    }
+    _tailBalance(state,tt,base,raw,score);
     return base;
   }
   const api = { cabF, towF, rigF, listBalanceGroups, autoBalanceGroups, RAN_EXTRA_LIST, RAN_SCEN, autoBalance, removedSteps, planDates, DEFAULT_TRM, TRM_FIXED, TRM_METHODS, trmCat, isAir, equipTxt, unitsOf, buildPdf, leadMin, cutArrive, WEEKEND, sub, bbText, bbNames, finishDate, normalize, daysOf, cutDayOf, DEFAULT_STATE, FIXED, schedule, activities, sitesOf, buildWorkbook, fmt, clock, hm, COLORS };
