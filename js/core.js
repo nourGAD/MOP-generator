@@ -501,7 +501,13 @@
     const crew = w => /Tower|Rigger/.test(w || "") ? "T" : /^Remote/.test(w || "") ? "R" : /Ground/.test(w || "") ? "G" : "O";
     // same crew works one step after the other: attach after that crew's last step of the day
     const crewAnchor = (d, a) => { const body = d.acts.slice(0, -1).filter(x => x.key !== "eod" && x !== a);
-      const same = body.filter(x => crew(x.who) === crew(a.who) && crew(a.who) !== "O"); return same.length ? [same[same.length - 1].key] : anchor(d); };
+      // Remote integrator always runs in parallel with field work
+      if (crew(a.who) === "R") return anchor(d);
+      // Same crew: wait for that crew's last step
+      const same = body.filter(x => crew(x.who) === crew(a.who) && crew(a.who) !== "O");
+      if (same.length) return [same[same.length - 1].key];
+      // Different non-remote crew: sequential after the last step in the day
+      return body.length ? [body[body.length - 1].key] : anchor(d); };
     const tailInto = (d, a) => { const last = d.acts[d.acts.length - 1]; if (last && last !== a && !last.after.includes(a.key)) last.after.push(a.key); };
     const insertBeforeLast = (d, a) => { d.acts.splice(Math.max(0, d.acts.length - 1), 0, a); };
     const batches = {};
@@ -1217,6 +1223,8 @@
     const dBy = Object.fromEntries(types.map(t => [t.name, t.sch.days.length])), cBy = Object.fromEntries(types.map(t => [t.name, t.sch.cutIdx]));
     const plan = planDates(state, sites, dBy, cBy);
     const siteDays = sites.reduce((a, x) => a + (dBy[x.type] || 0), 0);
+    const allBBText = types.flatMap(t => (t.basebands || []).filter(b => b.model && +b.qty > 0))
+      .map(b => `${b.qty}x ${b.status === "New" ? "New" : "Reuse"} ${b.model}${b.tech ? ` (${b.tech})` : ""}`).join(" + ") || "No baseband defined";
     const finish = sites.length ? new Date(Math.max(...plan.map(x => x.end.getTime()))) : new Date(P.startDate + "T00:00:00Z");
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     const W = doc.internal.pageSize.getWidth(), Hh = doc.internal.pageSize.getHeight(), M0 = 12;
