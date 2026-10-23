@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auto MOP — MOP Generator</title>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="vendor/exceljs.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root {
+  --ink:#172230; --ink-2:#4A5868; --line:#D5DCE4; --paper:#E9EDF1; --panel:#FFFFFF; --field:#F6F8FA;
+  --amber:#F2A20C; --amber-dk:#3B2600; --blue:#3F6FD8; --violet:#8B5CF6; --green:#2F9E44; --teal:#0F766E; --red:#D94141;
+  --shade:#E6EAEF; --focus:#1A73E8;
+  --sans:"IBM Plex Sans",system-ui,Arial,sans-serif;
+  --cond:"IBM Plex Sans Condensed","Arial Narrow",var(--sans);
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ink:#E7ECF2;--ink-2:#9AA7B6;--line:#2D3946;--paper:#0F151C;--panel:#17202A;--field:#1D2833;--shade:#222D39;
+}}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 var(--sans);font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+a{color:inherit;text-decoration:none}
+
+/* ── TOP BAR ── */
+.bar{position:sticky;top:0;z-index:10;display:flex;gap:12px;align-items:center;padding:10px 20px;background:var(--ink);color:#fff;flex-wrap:wrap}
+.bar-back{background:transparent;border:1px solid #5E7185;color:#fff;border-radius:6px;padding:8px 12px;cursor:pointer;font:600 13px var(--sans);white-space:nowrap}
+.bar-back:hover{border-color:#AFC0D2}
+.bar-title{font:700 18px/1 var(--cond);white-space:nowrap;flex-shrink:0}
+.bar-sub{font:500 12px/1 var(--cond);color:#AFC0D2;margin-top:2px}
+.bar-mast{flex:1;min-width:0}
+.bar-fields{display:flex;gap:10px;align-items:center}
+.bar-fields input{background:transparent;border:0;border-bottom:1px dashed #5E7185;color:#fff;font:600 17px/1.2 var(--cond);padding:2px 0;min-width:80px;max-width:200px}
+.bar-fields input::placeholder{color:#5E7185}
+.bar-fields input:focus{border-bottom-color:var(--amber);outline:none}
+.gen{background:var(--amber);color:var(--amber-dk);border:0;border-radius:6px;padding:10px 18px;font:700 14px/1 var(--cond);cursor:pointer;white-space:nowrap}
+.gen:hover{filter:brightness(1.07)}.gen:disabled{opacity:.6;cursor:progress}
+.gen.alt{background:transparent;color:var(--amber);border:1px solid var(--amber)}
+.gen.alt:hover{background:rgba(242,162,12,.1)}
+
+/* ── VIEW TABS ── */
+.vtabs{display:flex;gap:3px;background:rgba(255,255,255,.08);border:1px solid #5E7185;border-radius:7px;padding:3px}
+.vtab{background:transparent;border:0;color:#C9D3DE;font:700 13px/1 var(--cond);padding:8px 14px;border-radius:5px;cursor:pointer}
+.vtab.active,.vtab[aria-selected=true]{background:var(--amber);color:var(--amber-dk)}
+
+/* ── SETUP PHASE ── */
+.setup-wrap{max-width:820px;margin:0 auto;padding:28px 20px}
+.setup-wrap h2{font:700 22px/1.2 var(--cond);margin:0 0 4px}
+.setup-wrap .hint{color:var(--ink-2);font-size:12.5px;margin:0 0 18px}
+.eq-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.eq-row{display:grid;grid-template-columns:1fr 100px 72px 32px;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.eq-row input[type=text]{background:var(--field);border:1px solid var(--line);border-radius:5px;padding:7px 8px;width:100%}
+.eq-row select,.eq-row input[type=number]{background:var(--field);border:1px solid var(--line);border-radius:5px;padding:7px 8px;width:100%}
+.eq-row input[type=number]{text-align:right}
+.eq-remove{background:none;border:0;color:var(--ink-2);font-size:20px;cursor:pointer;padding:4px;line-height:1}
+.eq-remove:hover{color:var(--red)}
+.add-eq-btn{background:none;border:1px dashed var(--line);border-radius:6px;padding:9px;width:100%;cursor:pointer;color:var(--ink-2);font-size:13px}
+.add-eq-btn:hover{border-color:var(--ink-2);color:var(--ink)}
+.setup-options{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:20px}
+.setup-options label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-2)}
+.setup-options select,.setup-options input{background:var(--field);border:1px solid var(--line);border-radius:5px;padding:8px;width:100%}
+.eq-status-badge{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:10px}
+.eq-status-badge.new{background:#D3F9D8;color:#2B8A3E}
+.eq-status-badge.reu{background:#E7F0FF;color:#3F6FD8}
+.eq-label{font-size:11px;color:var(--ink-2);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+
+/* ── MOP VIEWS WRAPPER ── */
+.mop-wrap{padding:20px clamp(12px,3vw,28px) 60px;min-height:calc(100vh - 60px)}
+
+/* ── DASHBOARD ── */
+.dash-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.stat-card .sv{font:700 40px/1 var(--cond);margin-bottom:4px}
+.stat-card .sl{font-size:13px;color:var(--ink-2)}
+.dash-days{display:flex;flex-direction:column;gap:8px;margin-bottom:24px}
+.day-bar-row{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 18px}
+.day-bar-row .dhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.day-bar-row .dhead b{font:700 15px var(--cond)}
+.day-bar-row .dhead span{font-size:13px;color:var(--ink-2)}
+.day-bar-row.cutover .dhead b::after{content:" ⚡ Cutover";color:var(--red);font-size:13px;margin-left:8px}
+.bar-track{height:18px;background:var(--shade);border-radius:4px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:4px;transition:width .4s}
+.bar-fill.over{background:var(--red)}
+.day-meta{display:flex;gap:16px;margin-top:8px;font-size:12.5px;color:var(--ink-2)}
+.crew-section{margin-top:24px}
+.crew-section h3{font:700 17px var(--cond);margin:0 0 12px}
+.crew-list{display:flex;flex-direction:column;gap:6px}
+.crew-row{display:flex;align-items:center;gap:12px;font-size:13px}
+.crew-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.crew-name{width:180px;font-weight:600}
+.crew-bar{flex:1;height:10px;border-radius:3px;background:var(--shade);overflow:hidden}
+.crew-bar-fill{height:100%;border-radius:3px}
+.crew-hrs{width:60px;text-align:right;color:var(--ink-2)}
+
+/* ── GANTT ── */
+.gantt-day{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.gantt-day-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:10px;gap:10px}
+.gantt-day-head b{font:700 16px var(--cond)}
+.gantt-day-head span{font:600 13px var(--cond);color:var(--ink-2)}
+.gantt-day.cutover-day .gantt-day-head b::after{content:" ⚡";color:var(--red)}
+.gantt-scale{position:relative;height:20px;margin-left:180px;margin-bottom:4px;font-size:10.5px;color:var(--ink-2)}
+.gantt-scale span{position:absolute;transform:translateX(-50%)}
+.gantt-crew-group{margin-bottom:10px}
+.gantt-crew-label{font:700 12px var(--cond);color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.gantt-step-row{display:grid;grid-template-columns:180px 1fr;gap:8px;align-items:center;min-height:26px;border-top:1px solid var(--shade)}
+.gantt-step-name{font-size:12px;padding:4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+.gantt-track{position:relative;height:20px;background:linear-gradient(to right,var(--shade) 1px,transparent 1px) 0 0 / var(--tick-w,6.25%) 100%}
+.gantt-bar{position:absolute;top:3px;height:14px;border-radius:3px;font:700 10px/14px var(--cond);color:#fff;padding:0 5px;white-space:nowrap;overflow:hidden;min-width:3px}
+.gantt-cutover-line{position:absolute;top:0;bottom:0;width:2px;background:var(--red);opacity:.6;pointer-events:none}
+
+/* ── TABLE VIEW ── */
+.exec-table-wrap{overflow-x:auto}
+.exec-table{width:100%;border-collapse:collapse;font-size:13px;background:var(--panel);border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.exec-table th{background:var(--ink);color:#fff;font:700 12px var(--cond);padding:11px 12px;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:1}
+.exec-table td{padding:10px 12px;border-bottom:1px solid var(--shade);vertical-align:top}
+.exec-table tr:last-child td{border-bottom:0}
+.exec-table tr:hover td{background:var(--field)}
+.day-pill{display:inline-block;font:700 11px var(--cond);padding:2px 8px;border-radius:10px;color:#fff}
+.crew-pill{display:inline-block;font:600 11px var(--sans);padding:2px 8px;border-radius:10px;color:#fff}
+.prereq-list{font-size:11px;color:var(--ink-2);max-width:220px}
+.done-check{width:18px;height:18px;cursor:pointer;accent-color:var(--green)}
+.seq-num{font:700 13px var(--cond);color:var(--ink-2)}
+.dur-cell{white-space:nowrap;font:600 12px var(--cond)}
+.equip-tag{font-size:11px;color:var(--ink-2);font-style:italic}
+.cutover-row td{background:rgba(217,65,65,.05)!important}
+.cutover-row .day-pill{background:var(--red)!important}
+
+/* ── TOAST ── */
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:6px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:100}
+#toast.show{opacity:1}
+
+/* ── MISC ── */
+.empty-msg{text-align:center;padding:40px;color:var(--ink-2)}
+.section-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:16px}
+.section-card h3{font:700 16px var(--cond);margin:0 0 4px}
+@media(max-width:600px){.setup-options{grid-template-columns:1fr 1fr}.eq-row{grid-template-columns:1fr 80px 60px 28px}.bar-fields input{max-width:120px}}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ SETUP PHASE ═══════════════════ -->
+<div id="setup-phase">
+  <header class="bar">
+    <a href="index.html" class="bar-back">← Back</a>
+    <div class="bar-mast">
+      <div class="bar-title">Auto MOP</div>
+      <div class="bar-sub">RAN + TRM · fully automatic</div>
+    </div>
+    <div class="bar-fields">
+      <input id="proj-name" placeholder="Project name" aria-label="Project name">
+      <input id="proj-country" placeholder="Country" aria-label="Country">
+    </div>
+    <button class="gen" id="btn-generate">Generate MOP →</button>
+  </header>
+
+  <div class="setup-wrap">
+    <h2>Equipment</h2>
+    <p class="hint">Add each piece of equipment: name, whether it's New or Reused, and quantity. No other options needed — the MOP builds itself.</p>
+    <datalist id="eq-dl">
+      <option value="Radio Unit (RRU/RU)">
+      <option value="5G AIR Unit">
+      <option value="Baseband Unit (BBU/DU)">
+      <option value="Sector Antenna">
+      <option value="RBS Cabinet / ERS">
+      <option value="MW Antenna / Dish">
+      <option value="RAU / ODU">
+      <option value="IDU / ML 66xx">
+      <option value="ML 6352">
+      <!-- aliases -->
+      <option value="RRU"><option value="Radio"><option value="AIR"><option value="BBU">
+      <option value="DU"><option value="Antenna"><option value="Cabinet"><option value="Dish">
+      <option value="ODU"><option value="IDU"><option value="RAU">
+    </datalist>
+    <div class="eq-list" id="eq-list"></div>
+    <button class="add-eq-btn" id="btn-add-eq">+ Add Equipment</button>
+
+    <div class="setup-options">
+      <label>
+        <span class="eq-label">Max hours / day</span>
+        <select id="opt-maxhours">
+          <option value="480">8 hours</option>
+          <option value="540">9 hours</option>
+          <option value="600">10 hours</option>
+          <option value="660">11 hours</option>
+          <option value="720">12 hours</option>
+        </select>
+      </label>
+      <label>
+        <span class="eq-label">Day starts at</span>
+        <input type="time" id="opt-start" value="07:00">
+      </label>
+      <label>
+        <span class="eq-label">Cutover</span>
+        <select id="opt-cutover">
+          <option value="0">No outage</option>
+          <option value="1">Day 1</option>
+          <option value="2">Day 2</option>
+          <option value="3">Day 3</option>
+          <option value="4">Day 4</option>
+        </select>
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MOP PHASE ═══════════════════ -->
+<div id="mop-phase" hidden>
+  <header class="bar">
+    <button class="bar-back" id="btn-edit">← Edit</button>
+    <div class="vtabs" role="tablist">
+      <button class="vtab active" data-view="dashboard" role="tab">Dashboard</button>
+      <button class="vtab" data-view="gantt" role="tab">Gantt</button>
+      <button class="vtab" data-view="table" role="tab">Execution Table</button>
+    </div>
+    <div style="flex:1"></div>
+    <button class="gen alt" id="btn-pdf">PDF</button>
+    <button class="gen" id="btn-excel">Excel</button>
+  </header>
+
+  <div class="mop-wrap">
+    <div id="view-dashboard"></div>
+    <div id="view-gantt" hidden></div>
+    <div id="view-table" hidden></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  KNOWLEDGE BASE
+// ══════════════════════════════════════════════════════
+const KB = {
+  "Radio Unit (RRU/RU)": {
+    aliases:["rru","ru","radio","radio unit","ericsson radio","2219","2255","4488","rrus"],
+    cat:"RAN",
+    new:[
+      {k:"bracket", n:"Install mounting bracket",          m:15, c:"Tower crew",       p:[]},
+      {k:"mount",   n:"Hoist and mount radio unit",        m:20, c:"Tower crew",       p:["bracket"]},
+      {k:"ground",  n:"Ground radio unit",                 m:10, c:"Tower crew",       p:["mount"]},
+      {k:"rf",      n:"Run RF / jumper cables",            m:20, c:"Tower crew",       p:["mount"]},
+      {k:"dc",      n:"Run DC power cable",                m:15, c:"Tower crew",       p:["mount"]},
+      {k:"cpri",    n:"CPRI / fiber connection at baseband", m:15, c:"Ground tech",   p:["dc","rf"]}
+    ],
+    reu:[
+      {k:"dismantle",n:"Disconnect and dismantle existing radio", m:20, c:"Tower crew", p:[]},
+      {k:"mount",    n:"Mount replacement radio unit",            m:20, c:"Tower crew", p:["dismantle"]},
+      {k:"rf",       n:"Reconnect RF / jumper cables",           m:10, c:"Tower crew", p:["mount"]},
+      {k:"dc",       n:"Reconnect DC power cable",               m:10, c:"Tower crew", p:["mount"]},
+      {k:"cpri",     n:"Reconnect CPRI / fiber at baseband",     m:10, c:"Ground tech",p:["dc","rf"]}
+    ]
+  },
+
+  "5G AIR Unit": {
+    aliases:["air","airrus","5g air","air unit","air 3298","air 6449","air 6488","air 3246"],
+    cat:"RAN",
+    new:[
+      {k:"bracket",  n:"Install AIR mounting bracket",     m:20, c:"Tower crew",  p:[]},
+      {k:"mount",    n:"Hoist and mount AIR unit",         m:30, c:"Tower crew",  p:["bracket"]},
+      {k:"ground",   n:"Ground AIR unit",                  m:10, c:"Tower crew",  p:["mount"]},
+      {k:"fiber",    n:"Route CPRI fiber to shelter",      m:25, c:"Tower crew",  p:["mount"]},
+      {k:"dc",       n:"Route DC power cable",             m:20, c:"Tower crew",  p:["mount"]},
+      {k:"fiber_bb", n:"Terminate fiber at DU / BBU",      m:15, c:"Ground tech", p:["fiber"]},
+      {k:"align",    n:"AIR unit alignment check",         m:20, c:"Tower crew",  p:["mount"]}
+    ],
+    reu:[
+      {k:"dismantle",n:"Dismantle existing AIR unit",       m:25, c:"Tower crew",  p:[]},
+      {k:"mount",    n:"Mount replacement AIR unit",        m:30, c:"Tower crew",  p:["dismantle"]},
+      {k:"fiber",    n:"Reconnect CPRI fiber",              m:10, c:"Tower crew",  p:["mount"]},
+      {k:"dc",       n:"Reconnect DC power",                m:10, c:"Tower crew",  p:["mount"]},
+      {k:"ground",   n:"Ground AIR unit",                   m:10, c:"Tower crew",  p:["mount"]},
+      {k:"align",    n:"AIR unit alignment check",          m:20, c:"Tower crew",  p:["mount"]}
+    ]
+  },
+
+  "Baseband Unit (BBU/DU)": {
+    aliases:["bbu","du","baseband","baseband 6630","baseband 5216","baseband 5212","dus","cudu","dpb"],
+    cat:"RAN",
+    new:[
+      {k:"rack",   n:"Mount BBU / DU in rack or cabinet",       m:30, c:"Ground tech",       p:[]},
+      {k:"ground", n:"Ground BBU / DU",                         m:10, c:"Ground tech",       p:["rack"]},
+      {k:"power",  n:"Connect DC power",                        m:20, c:"Ground tech",       p:["rack"]},
+      {k:"cpri",   n:"Connect CPRI / eCPRI ports",              m:20, c:"Ground tech",       p:["rack"]},
+      {k:"eth",    n:"Connect Ethernet / management cables",    m:15, c:"Ground tech",       p:["rack"]},
+      {k:"sw",     n:"Software load and license activation",    m:30, c:"Remote integrator", p:["power","eth"]}
+    ],
+    reu:[
+      {k:"backup",    n:"Take configuration backup",            m:20, c:"Remote integrator", p:[]},
+      {k:"poweroff",  n:"Controlled power-off",                 m:10, c:"Ground tech",       p:["backup"]},
+      {k:"disconnect",n:"Disconnect all cables",                m:20, c:"Ground tech",       p:["poweroff"]},
+      {k:"replace",   n:"Replace BBU / DU unit",               m:25, c:"Ground tech",       p:["disconnect"]},
+      {k:"reconnect", n:"Reconnect all cables",                 m:20, c:"Ground tech",       p:["replace"]},
+      {k:"restore",   n:"Restore configuration and verify",     m:30, c:"Remote integrator", p:["reconnect"]}
+    ]
+  },
+
+  "Sector Antenna": {
+    aliases:["antenna","sector","passive antenna","cross-dipole","anten","ants"],
+    cat:"RAN",
+    new:[
+      {k:"bracket",n:"Install antenna mounting bracket",   m:20, c:"Tower crew", p:[]},
+      {k:"mount",  n:"Hoist and mount antenna",           m:25, c:"Tower crew", p:["bracket"]},
+      {k:"jumper", n:"Connect jumper cables",             m:15, c:"Tower crew", p:["mount"]},
+      {k:"align",  n:"Set azimuth and mechanical tilt",   m:20, c:"Tower crew", p:["mount"]}
+    ],
+    reu:[
+      {k:"dismantle",n:"Dismantle existing antenna",     m:20, c:"Tower crew", p:[]},
+      {k:"mount",    n:"Mount new antenna",              m:25, c:"Tower crew", p:["dismantle"]},
+      {k:"jumper",   n:"Reconnect jumper cables",        m:10, c:"Tower crew", p:["mount"]},
+      {k:"align",    n:"Re-align azimuth and tilt",      m:20, c:"Tower crew", p:["mount"]}
+    ]
+  },
+
+  "RBS Cabinet / ERS": {
+    aliases:["rbs","cabinet","ers","outdoor cabinet","rbs 6601","rbs 6602","rbs cabinet"],
+    cat:"RAN",
+    new:[
+      {k:"position",n:"Position and level cabinet",            m:30, c:"Ground tech", p:[]},
+      {k:"anchor",  n:"Anchor cabinet to floor / foundation",  m:25, c:"Ground tech", p:["position"]},
+      {k:"power",   n:"Connect AC / DC power supply",          m:30, c:"Ground tech", p:["anchor"]},
+      {k:"ground",  n:"Ground cabinet",                        m:15, c:"Ground tech", p:["anchor"]},
+      {k:"cables",  n:"Route and dress feeder / fiber cables", m:25, c:"Ground tech", p:["position"]}
+    ],
+    reu:[
+      {k:"inspect",  n:"Inspect and clean cabinet",            m:20, c:"Ground tech", p:[]},
+      {k:"replace",  n:"Replace faulty module or PSU",         m:30, c:"Ground tech", p:["inspect"]},
+      {k:"reconnect",n:"Reconnect cables and verify power",    m:20, c:"Ground tech", p:["replace"]}
+    ]
+  },
+
+  "MW Antenna / Dish": {
+    aliases:["mw antenna","dish","microwave antenna","parabolic","hp antenna","mw dish"],
+    cat:"TRM",
+    new:[
+      {k:"bracket",   n:"Install antenna bracket / mount",          m:25, c:"Riggers", p:[]},
+      {k:"hoist",     n:"Hoist and mount dish",                     m:30, c:"Riggers", p:["bracket"]},
+      {k:"rough",     n:"Rough alignment – azimuth and elevation",  m:20, c:"Riggers", p:["hoist"]},
+      {k:"waveguide", n:"Connect waveguide or coax cable",          m:20, c:"Riggers", p:["hoist"]}
+    ],
+    reu:[
+      {k:"dismantle", n:"Dismantle and lower existing dish",        m:30, c:"Riggers", p:[]},
+      {k:"mount",     n:"Mount new dish",                           m:30, c:"Riggers", p:["dismantle"]},
+      {k:"waveguide", n:"Reconnect waveguide / coax",               m:20, c:"Riggers", p:["mount"]},
+      {k:"align",     n:"Fine alignment and link test",             m:30, c:"Riggers", p:["mount"]}
+    ]
+  },
+
+  "RAU / ODU": {
+    aliases:["rau","odu","outdoor unit","radio access unit","rau 03"],
+    cat:"TRM",
+    new:[
+      {k:"bracket",   n:"Mount RAU bracket",                        m:15, c:"Riggers", p:[]},
+      {k:"install",   n:"Install RAU / ODU unit",                   m:20, c:"Riggers", p:["bracket"]},
+      {k:"waveguide", n:"Connect waveguide to antenna",             m:15, c:"Riggers", p:["install"]},
+      {k:"if_cable",  n:"Run IF / Ethernet cable to IDU",          m:20, c:"Riggers", p:["install"]},
+      {k:"ground",    n:"Ground ODU",                               m:10, c:"Riggers", p:["install"]}
+    ],
+    reu:[
+      {k:"disconnect",n:"Disconnect and remove existing RAU / ODU", m:15, c:"Riggers", p:[]},
+      {k:"install",   n:"Mount and install replacement RAU / ODU",  m:20, c:"Riggers", p:["disconnect"]},
+      {k:"waveguide", n:"Reconnect waveguide",                      m:10, c:"Riggers", p:["install"]},
+      {k:"if_cable",  n:"Reconnect IF / Ethernet cable",           m:10, c:"Riggers", p:["install"]},
+      {k:"ground",    n:"Ground ODU",                               m:10, c:"Riggers", p:["install"]}
+    ]
+  },
+
+  "IDU / ML 66xx": {
+    aliases:["idu","ml 66","ml66","ml 6600","ml 6612","ml 6630","indoor unit","ml6600","ml6612","ml6630"],
+    cat:"TRM",
+    new:[
+      {k:"rack",   n:"Rack-mount IDU",                              m:20, c:"FE / TX engineer",   p:[]},
+      {k:"power",  n:"Connect DC power",                            m:15, c:"FE / TX engineer",   p:["rack"]},
+      {k:"if_in",  n:"Connect IF / Ethernet cable from ODU",       m:15, c:"FE / TX engineer",   p:["rack"]},
+      {k:"mgmt",   n:"Connect management / Ethernet",              m:10, c:"FE / TX engineer",   p:["rack"]},
+      {k:"config", n:"Configure and bring up radio link",           m:40, c:"Remote integrator",  p:["power","if_in","mgmt"]}
+    ],
+    reu:[
+      {k:"backup",    n:"Backup current configuration",             m:20, c:"Remote integrator",  p:[]},
+      {k:"poweroff",  n:"Controlled power-off",                     m:10, c:"FE / TX engineer",   p:["backup"]},
+      {k:"disconnect",n:"Disconnect all cables",                    m:15, c:"FE / TX engineer",   p:["poweroff"]},
+      {k:"replace",   n:"Replace IDU unit",                         m:20, c:"FE / TX engineer",   p:["disconnect"]},
+      {k:"reconnect", n:"Reconnect all cables",                     m:15, c:"FE / TX engineer",   p:["replace"]},
+      {k:"restore",   n:"Restore configuration and verify link",    m:30, c:"Remote integrator",  p:["reconnect"]}
+    ]
+  },
+
+  "ML 6352": {
+    aliases:["ml 6352","ml6352","mini-link 6352","minilink 6352"],
+    cat:"TRM",
+    new:[
+      {k:"mount",   n:"Mount ML 6352 bracket",               m:20, c:"Riggers",            p:[]},
+      {k:"install", n:"Install ML 6352 unit",                m:25, c:"Riggers",            p:["mount"]},
+      {k:"cable",   n:"Connect IF cable",                    m:15, c:"Riggers",            p:["install"]},
+      {k:"eth",     n:"Connect Ethernet / PoE",              m:10, c:"FE / TX engineer",   p:["install"]},
+      {k:"config",  n:"Configure and test link",             m:35, c:"Remote integrator",  p:["cable","eth"]}
+    ],
+    reu:[
+      {k:"backup",    n:"Backup configuration",              m:15, c:"Remote integrator",  p:[]},
+      {k:"dismantle", n:"Remove existing ML 6352",           m:20, c:"Riggers",            p:["backup"]},
+      {k:"install",   n:"Install replacement ML 6352",       m:25, c:"Riggers",            p:["dismantle"]},
+      {k:"reconnect", n:"Reconnect cables",                  m:15, c:"Riggers",            p:["install"]},
+      {k:"config",    n:"Restore config and verify",         m:25, c:"Remote integrator",  p:["reconnect"]}
+    ]
+  }
+};
+
+// Global bookend steps
+const G_START = [
+  {id:"g_brief",  n:"Safety briefing and site access",       m:15, c:"Team lead", p:[]},
+  {id:"g_survey", n:"Site survey and pre-work inspection",   m:30, c:"Team lead", p:["g_brief"]}
+];
+const G_END = [
+  {id:"g_sat",     n:"Site Acceptance Test (SAT)",           m:60, c:"Ground tech",     p:[]},
+  {id:"g_cleanup", n:"Site cleanup and handover documentation", m:30, c:"Team lead",    p:["g_sat"]}
+];
+
+// ══════════════════════════════════════════════════════
+//  EQUIPMENT NAME RESOLVER
+// ══════════════════════════════════════════════════════
+function resolveEquip(name) {
+  const n = name.toLowerCase().trim();
+  for (const [key, val] of Object.entries(KB)) {
+    if (key.toLowerCase() === n) return key;
+    if (val.aliases && val.aliases.some(a => a.toLowerCase() === n)) return key;
+  }
+  // Partial / substring match
+  for (const [key, val] of Object.entries(KB)) {
+    if (key.toLowerCase().includes(n) || n.includes(key.toLowerCase().split(/[\s/]/)[0])) return key;
+    if (val.aliases && val.aliases.some(a => n.includes(a) || a.includes(n))) return key;
+  }
+  return null;
+}
+
+// ══════════════════════════════════════════════════════
+//  STEP GENERATION
+// ══════════════════════════════════════════════════════
+function generateSteps(items, cutoverDay) {
+  const steps = [];
+
+  // Global start steps
+  for (const gs of G_START) {
+    steps.push({id:gs.id, name:gs.n, equipment:"General", duration:gs.m, crew:gs.c, prereqs:gs.p.slice(), day:0, startMin:0, endMin:0, seqNum:0, done:false, isGeneral:true});
+  }
+
+  // Equipment steps
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const kbEntry = KB[item.equipKey];
+    const defs = kbEntry ? (item.status === "new" ? kbEntry.new : kbEntry.reu) : null;
+
+    if (!defs) {
+      // Unknown equipment — add generic step
+      steps.push({
+        id:`${i}_install`, name:`Install / connect ${item.name}${item.qty>1?` (×${item.qty})`:""}`,
+        equipment:item.name, duration:60*item.qty, crew:"Ground tech",
+        prereqs:["g_survey"], day:0, startMin:0, endMin:0, seqNum:0, done:false
+      });
+      continue;
+    }
+
+    for (const sd of defs) {
+      const stepId = `${i}_${sd.k}`;
+      const prereqs = sd.p.map(p => `${i}_${p}`);
+      if (sd.p.length === 0) prereqs.push("g_survey");
+      steps.push({
+        id:stepId,
+        name:`${sd.n}${item.qty>1?` (×${item.qty})`:""}`,
+        equipment:item.equipKey || item.name,
+        duration:sd.m * item.qty,
+        crew:sd.c,
+        prereqs,
+        day:0, startMin:0, endMin:0, seqNum:0, done:false
+      });
+    }
+  }
+
+  // Find leaf nodes before adding end steps
+  const allPrereqIds = new Set(steps.flatMap(s => s.prereqs));
+  const leafIds = steps
+    .filter(s => !allPrereqIds.has(s.id) && !G_START.map(g=>g.id).includes(s.id))
+    .map(s => s.id);
+
+  // Global end steps
+  for (let i = 0; i < G_END.length; i++) {
+    const ge = G_END[i];
+    steps.push({
+      id:ge.id, name:ge.n, equipment:"General", duration:ge.m, crew:ge.c,
+      prereqs: i===0 ? leafIds : [G_END[i-1].id],
+      day:0, startMin:0, endMin:0, seqNum:0, done:false, isGeneral:true
+    });
+  }
+
+  return steps;
+}
+
+// ══════════════════════════════════════════════════════
+//  TOPOLOGICAL SORT
+// ══════════════════════════════════════════════════════
+function topoSort(steps) {
+  const byId = Object.fromEntries(steps.map(s => [s.id, s]));
+  const visited = new Set(), result = [];
+  function dfs(s) {
+    if (visited.has(s.id)) return;
+    visited.add(s.id);
+    for (const pid of s.prereqs) { if (byId[pid]) dfs(byId[pid]); }
+    result.push(s);
+  }
+  for (const s of steps) dfs(s);
+  return result;
+}
+
+// ══════════════════════════════════════════════════════
+//  DAY PLANNING
+// ══════════════════════════════════════════════════════
+function planDays(steps, maxMinPerDay, cutoverDay) {
+  const sorted = topoSort(steps);
+  const crewDayUsed = {}; // `${day}_${crew}` → minutes
+  const stepDay = {};
+
+  for (const step of sorted) {
+    const minDay = step.prereqs.length
+      ? Math.max(...step.prereqs.map(pid => stepDay[pid] || 1))
+      : 1;
+
+    let day = minDay;
+    for (;;) {
+      const key = `${day}_${step.crew}`;
+      const used = crewDayUsed[key] || 0;
+      if (used + step.duration <= maxMinPerDay) {
+        crewDayUsed[key] = used + step.duration;
+        stepDay[step.id] = day;
+        step.day = day;
+        break;
+      }
+      day++;
+    }
+  }
+
+  // Cutover steps: inject into cutover day AFTER planning
+  if (cutoverDay > 0) {
+    const cDay = Math.min(cutoverDay, Math.max(...steps.map(s => s.day)));
+    const dayStepIds = new Set(steps.filter(s=>s.day===cDay).map(s=>s.id));
+    const dayPrereqIds = new Set(steps.filter(s=>s.day===cDay).flatMap(s=>s.prereqs));
+    const cutLeaves = [...dayStepIds].filter(id => !dayPrereqIds.has(id));
+
+    const cutSteps = [
+      {id:"g_cut_down", name:"Start outage — cells down", equipment:"Cutover",
+       duration:10, crew:"Remote integrator", prereqs:["g_survey"],
+       day:cDay, startMin:0, endMin:0, seqNum:0, done:false, isCutover:true},
+      {id:"g_cut_up",   name:"Cells up — restore traffic", equipment:"Cutover",
+       duration:10, crew:"Remote integrator", prereqs:cutLeaves.length ? cutLeaves : ["g_survey"],
+       day:cDay, startMin:0, endMin:0, seqNum:0, done:false, isCutover:true},
+      {id:"g_cut_rfi",  name:"RFI / service verification", equipment:"Cutover",
+       duration:30, crew:"Ground tech", prereqs:["g_cut_up"],
+       day:cDay, startMin:0, endMin:0, seqNum:0, done:false, isCutover:true}
+    ];
+    steps.push(...cutSteps);
+
+    // Make g_sat depend on cutover steps too
+    const sat = steps.find(s=>s.id==="g_sat");
+    if (sat) { sat.prereqs = sat.prereqs.filter(p=>p!=="g_cut_rfi"); sat.prereqs.push("g_cut_rfi"); }
+  }
+
+  // Schedule within each day
+  scheduleDays(steps);
+
+  // Assign sequence numbers in topo order
+  const finalSorted = topoSort(steps);
+  finalSorted.forEach((s, i) => { s.seqNum = i + 1; });
+
+  return steps;
+}
+
+function scheduleDays(steps) {
+  const days = [...new Set(steps.map(s=>s.day))].sort((a,b)=>a-b);
+  for (const day of days) {
+    const daySteps = steps.filter(s=>s.day===day);
+    const sorted = topoSort(daySteps);
+    const crewEnd = {};
+    const stepEndHere = {};
+    for (const step of sorted) {
+      const sameDay = step.prereqs.filter(pid => stepEndHere[pid]!==undefined);
+      const prereqEnd = sameDay.length ? Math.max(...sameDay.map(pid=>stepEndHere[pid])) : 0;
+      const crewAvail = crewEnd[step.crew] || 0;
+      step.startMin = Math.max(prereqEnd, crewAvail);
+      step.endMin   = step.startMin + step.duration;
+      crewEnd[step.crew] = step.endMin;
+      stepEndHere[step.id] = step.endMin;
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  CREW COLOR HELPER
+// ══════════════════════════════════════════════════════
+const CREW_MAP = [
+  {match:"tower crew",   col:"#F2A20C"},
+  {match:"rigger",       col:"#F2A20C"},
+  {match:"ground tech",  col:"#3F6FD8"},
+  {match:"fe / tx",      col:"#0F766E"},
+  {match:"fe",           col:"#3F6FD8"},
+  {match:"remote",       col:"#8B5CF6"},
+  {match:"team lead",    col:"#2F9E44"}
+];
+function crewColor(crew) {
+  const lc = crew.toLowerCase();
+  for (const {match, col} of CREW_MAP) if (lc.includes(match)) return col;
+  return "#9AA7B6";
+}
+
+// ══════════════════════════════════════════════════════
+//  CLOCK HELPERS
+// ══════════════════════════════════════════════════════
+function minToClock(dayStartMin, offsetMin) {
+  const total = dayStartMin + offsetMin;
+  const h = Math.floor(total/60) % 24;
+  const m = total % 60;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+}
+function fmtDur(min) {
+  const h = Math.floor(min/60), m = min%60;
+  return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`;
+}
+function dayStartMinutes(timeStr) {
+  const [h,m] = (timeStr||"07:00").split(":").map(Number);
+  return h*60+(m||0);
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER: DASHBOARD
+// ══════════════════════════════════════════════════════
+function renderDashboard(steps, cutoverDay, maxMin) {
+  const days = [...new Set(steps.map(s=>s.day))].sort((a,b)=>a-b);
+  const totalMin = steps.reduce((a,s)=>a+s.duration,0);
+
+  // Crew totals
+  const crewMin = {};
+  for (const s of steps) crewMin[s.crew] = (crewMin[s.crew]||0) + s.duration;
+  const maxCrew = Math.max(...Object.values(crewMin));
+
+  // Day wall-clock max (per-crew peak within day)
+  function dayWallClock(d) {
+    return Math.max(...steps.filter(s=>s.day===d).map(s=>s.endMin), 0);
+  }
+
+  let html = `
+  <div class="dash-stats">
+    <div class="stat-card"><div class="sv" style="color:var(--blue)">${days.length}</div><div class="sl">Days on site</div></div>
+    <div class="stat-card"><div class="sv" style="color:var(--amber)">${fmtDur(totalMin)}</div><div class="sl">Total crew-hours</div></div>
+    <div class="stat-card"><div class="sv" style="color:var(--violet)">${steps.length}</div><div class="sl">Total steps</div></div>
+    <div class="stat-card"><div class="sv" style="color:var(--green)">${steps.filter(s=>!s.isGeneral&&!s.isCutover).reduce((a,s)=>new Set([...a,[s.equipment]]),new Set()).size}</div><div class="sl">Equipment types</div></div>
+  </div>
+
+  <div class="section-card">
+    <h3>Day-by-day breakdown</h3>
+    <p style="color:var(--ink-2);font-size:12.5px;margin:0 0 14px">Each bar shows the critical-path duration per day (longest crew's working time).</p>
+    <div class="dash-days">`;
+
+  for (const d of days) {
+    const wall = dayWallClock(d);
+    const pct = Math.min(100, wall/maxMin*100).toFixed(1);
+    const over = wall > maxMin;
+    const isCut = d === cutoverDay;
+    const daySteps = steps.filter(s=>s.day===d);
+    html += `
+    <div class="day-bar-row${isCut?" cutover":""}">
+      <div class="dhead"><b>Day ${d}</b><span>${fmtDur(wall)} · ${daySteps.length} steps</span></div>
+      <div class="bar-track"><div class="bar-fill${over?" over":""}" style="width:${pct}%;background:${over?"var(--red)":isCut?"var(--red)":"var(--blue)"}"></div></div>
+      <div class="day-meta">
+        ${daySteps.map(s=>`<span style="color:${crewColor(s.crew)}">${s.crew}</span>`).reduce((a,v)=>{const s=a.find(x=>x===v)?a:a.includes(v)?a:[...a,v];return s},[]).join(" ")}
+      </div>
+    </div>`;
+  }
+
+  html += `</div></div>
+  <div class="section-card">
+    <h3>Crew hours</h3>
+    <div class="crew-list">`;
+  for (const [crew, min] of Object.entries(crewMin).sort((a,b)=>b[1]-a[1])) {
+    html += `
+    <div class="crew-row">
+      <div class="crew-dot" style="background:${crewColor(crew)}"></div>
+      <div class="crew-name">${crew}</div>
+      <div class="crew-bar"><div class="crew-bar-fill" style="width:${(min/maxCrew*100).toFixed(1)}%;background:${crewColor(crew)}"></div></div>
+      <div class="crew-hrs">${fmtDur(min)}</div>
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  document.getElementById("view-dashboard").innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER: GANTT
+// ══════════════════════════════════════════════════════
+function renderGantt(steps, cutoverDay, startTimeStr) {
+  const dayStartMin = dayStartMinutes(startTimeStr);
+  const days = [...new Set(steps.map(s=>s.day))].sort((a,b)=>a-b);
+  let html = "";
+
+  for (const day of days) {
+    const daySteps = steps.filter(s=>s.day===day);
+    const wallMax = Math.max(...daySteps.map(s=>s.endMin), 120);
+    const isCut = day === cutoverDay;
+    const tickStep = wallMax <= 120 ? 30 : wallMax <= 300 ? 60 : 120;
+
+    // Group steps by crew
+    const crewGroups = {};
+    for (const s of daySteps) {
+      if (!crewGroups[s.crew]) crewGroups[s.crew] = [];
+      crewGroups[s.crew].push(s);
+    }
+
+    // Scale ticks
+    let ticks = "";
+    for (let m = 0; m <= wallMax; m += tickStep) {
+      ticks += `<span style="left:${(m/wallMax*100).toFixed(1)}%">${minToClock(dayStartMin,m)}</span>`;
+    }
+
+    html += `<div class="gantt-day${isCut?" cutover-day":""}">
+    <div class="gantt-day-head">
+      <b>Day ${day}</b>
+      <span>${minToClock(dayStartMin,0)} → ${minToClock(dayStartMin,wallMax)} · ${fmtDur(wallMax)}</span>
+    </div>
+    <div class="gantt-scale">${ticks}</div>`;
+
+    for (const [crew, cSteps] of Object.entries(crewGroups)) {
+      html += `<div class="gantt-crew-group">
+      <div class="gantt-crew-label">
+        <span style="width:10px;height:10px;background:${crewColor(crew)};border-radius:50%;display:inline-block"></span>
+        ${crew}
+      </div>`;
+      for (const s of cSteps.sort((a,b)=>a.startMin-b.startMin)) {
+        const lp = (s.startMin/wallMax*100).toFixed(2);
+        const wp = (s.duration/wallMax*100).toFixed(2);
+        const bg = s.isCutover ? "var(--red)" : crewColor(s.crew);
+        html += `<div class="gantt-step-row">
+          <div class="gantt-step-name" title="${s.name}">${s.seqNum}. ${s.name}</div>
+          <div class="gantt-track" style="--tick-w:${(tickStep/wallMax*100).toFixed(2)}%">
+            <div class="gantt-bar" style="left:${lp}%;width:${wp}%;background:${bg}" title="${minToClock(dayStartMin,s.startMin)} → ${minToClock(dayStartMin,s.endMin)} · ${fmtDur(s.duration)}">${s.duration>=30?fmtDur(s.duration):""}</div>
+          </div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+
+  document.getElementById("view-gantt").innerHTML = html || `<div class="empty-msg">No steps generated.</div>`;
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER: EXECUTION TABLE
+// ══════════════════════════════════════════════════════
+function renderTable(steps) {
+  const dayColors = ["#3F6FD8","#2F9E44","#F2A20C","#8B5CF6","#D94141","#0F766E","#9AA7B6"];
+  const dc = d => dayColors[(d-1) % dayColors.length];
+
+  const sorted = [...steps].sort((a,b)=>a.seqNum-b.seqNum);
+  let rows = "";
+  for (const s of sorted) {
+    const prereqNames = s.prereqs.map(pid => {
+      const ps = steps.find(x=>x.id===pid);
+      return ps ? `${ps.seqNum}. ${ps.name.slice(0,30)}${ps.name.length>30?"…":""}` : pid;
+    }).join("; ");
+    rows += `<tr class="${s.isCutover?"cutover-row":""}">
+      <td class="seq-num">${s.seqNum}</td>
+      <td><span class="day-pill" style="background:${dc(s.day)}">Day ${s.day}</span></td>
+      <td>${s.name}${s.isCutover?` <span style="color:var(--red)">⚡</span>`:""}</td>
+      <td class="equip-tag">${s.equipment}</td>
+      <td class="dur-cell">${fmtDur(s.duration)}</td>
+      <td><span class="crew-pill" style="background:${crewColor(s.crew)}">${s.crew}</span></td>
+      <td class="prereq-list">${prereqNames || "—"}</td>
+      <td><input type="checkbox" class="done-check" data-id="${s.id}" ${s.done?"checked":""}></td>
+    </tr>`;
+  }
+
+  document.getElementById("view-table").innerHTML = `
+  <div class="exec-table-wrap">
+    <table class="exec-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Day</th><th>Activity</th><th>Equipment</th>
+          <th>Duration</th><th>Crew</th><th>Prerequisites</th><th>Done</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+
+  // Checkbox handler
+  document.getElementById("view-table").querySelectorAll(".done-check").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const s = currentSteps.find(x=>x.id===cb.dataset.id);
+      if (s) s.done = cb.checked;
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  EXPORT: EXCEL
+// ══════════════════════════════════════════════════════
+async function exportExcel(steps, project) {
+  if (!window.ExcelJS) { toast("Excel library not loaded."); return; }
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "MOP Generator — Auto Mode";
+
+  // Sheet 1: Dashboard
+  const ds = wb.addWorksheet("Dashboard");
+  ds.columns = [{width:28},{width:20}];
+  const orange = {type:"pattern",pattern:"solid",fgColor:{argb:"FFFF6A1A"}};
+  ds.addRow(["Auto MOP — " + (project.name||"Project"), ""]).font = {bold:true,size:16};
+  ds.addRow(["Country:", project.country||""]);
+  ds.addRow(["Generated:", new Date().toLocaleDateString()]);
+  ds.addRow([]);
+  ds.addRow(["SUMMARY",""]).font={bold:true};
+  const days=[...new Set(steps.map(s=>s.day))].sort((a,b)=>a-b);
+  ds.addRow(["Days on site:", days.length]);
+  ds.addRow(["Total steps:", steps.length]);
+  ds.addRow(["Total crew-hours:", fmtDur(steps.reduce((a,s)=>a+s.duration,0))]);
+  ds.addRow([]);
+  ds.addRow(["DAY BREAKDOWN",""]).font={bold:true};
+  for (const d of days) {
+    const ds2=steps.filter(s=>s.day===d);
+    const wall=Math.max(...ds2.map(s=>s.endMin),0);
+    ds.addRow([`Day ${d}`, fmtDur(wall)+" critical path · "+ds2.length+" steps"]);
+  }
+
+  // Sheet 2: Execution Table
+  const es = wb.addWorksheet("Execution Table");
+  es.columns=[
+    {header:"#",key:"seq",width:5},
+    {header:"Day",key:"day",width:6},
+    {header:"Activity",key:"name",width:42},
+    {header:"Equipment",key:"equip",width:22},
+    {header:"Duration",key:"dur",width:12},
+    {header:"Crew",key:"crew",width:22},
+    {header:"Prerequisites",key:"prereq",width:40},
+    {header:"Done",key:"done",width:7}
+  ];
+  es.getRow(1).font={bold:true};
+  es.getRow(1).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF172230"}};
+  es.getRow(1).font={bold:true,color:{argb:"FFFFFFFF"}};
+
+  const sorted=[...steps].sort((a,b)=>a.seqNum-b.seqNum);
+  for (const s of sorted) {
+    const prereqNames=s.prereqs.map(pid=>{
+      const ps=steps.find(x=>x.id===pid);
+      return ps?`${ps.seqNum}. ${ps.name}`:pid;
+    }).join("; ");
+    const row=es.addRow({seq:s.seqNum,day:`Day ${s.day}`,name:s.name,equip:s.equipment,dur:fmtDur(s.duration),crew:s.crew,prereq:prereqNames||"—",done:s.done?"✓":""});
+    if (s.isCutover) row.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFEAEA"}};
+  }
+
+  const buf = await wb.xlsx.writeBuffer();
+  const name = (project.name||"AutoMOP").replace(/[^\w\-]/g,"_")+"_MOP.xlsx";
+  dlBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), name);
+  toast("Excel downloaded.");
+}
+
+// ══════════════════════════════════════════════════════
+//  EXPORT: PDF
+// ══════════════════════════════════════════════════════
+async function exportPdf(steps, project) {
+  if (!window.jspdf?.jsPDF) { toast("PDF library not loaded."); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
+  const sorted=[...steps].sort((a,b)=>a.seqNum-b.seqNum);
+
+  // Title
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(16);
+  doc.text("Auto MOP — " + (project.name||"Project"), 14, 16);
+  doc.setFontSize(10);
+  doc.setFont("helvetica","normal");
+  doc.text(`${project.country||""} · Generated ${new Date().toLocaleDateString()} · ${sorted.length} steps · ${[...new Set(sorted.map(s=>s.day))].length} days`, 14, 23);
+
+  doc.autoTable({
+    startY: 28,
+    head:[["#","Day","Activity","Equipment","Duration","Crew","Prerequisites","Done"]],
+    body: sorted.map(s=>([
+      s.seqNum,
+      `Day ${s.day}`,
+      s.name,
+      s.equipment,
+      fmtDur(s.duration),
+      s.crew,
+      s.prereqs.map(pid=>{const ps=steps.find(x=>x.id===pid);return ps?`${ps.seqNum}. ${ps.name.slice(0,25)}`:pid;}).join("; ")||"—",
+      ""
+    ])),
+    styles:{fontSize:8,cellPadding:2},
+    headStyles:{fillColor:[23,34,48],textColor:255,fontStyle:"bold"},
+    columnStyles:{0:{cellWidth:8},1:{cellWidth:12},2:{cellWidth:55},3:{cellWidth:30},4:{cellWidth:16},5:{cellWidth:26},7:{cellWidth:10}},
+    didParseCell:(data)=>{
+      if(data.row.index!==undefined&&sorted[data.row.index]?.isCutover) data.cell.styles.fillColor=[255,235,235];
+    }
+  });
+
+  const name=(project.name||"AutoMOP").replace(/[^\w\-]/g,"_")+"_MOP.pdf";
+  doc.save(name);
+  toast("PDF downloaded.");
+}
+
+function dlBlob(blob, name) {
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+
+// ══════════════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════════════
+function toast(msg) {
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),3200);
+}
+
+// ══════════════════════════════════════════════════════
+//  EQUIPMENT ROW UI
+// ══════════════════════════════════════════════════════
+let rowId = 0;
+function addEquipRow(name="", status="new", qty=1) {
+  const id = rowId++;
+  const div = document.createElement("div");
+  div.className = "eq-row";
+  div.dataset.rid = id;
+  div.innerHTML = `
+    <input type="text" class="eq-name" list="eq-dl" placeholder="Type equipment name…" value="${name}" autocomplete="off">
+    <select class="eq-status">
+      <option value="new"${status==="new"?" selected":""}>New</option>
+      <option value="reused"${status==="reused"?" selected":""}>Reused</option>
+    </select>
+    <input type="number" class="eq-qty" min="1" max="99" value="${qty}" aria-label="Quantity">
+    <button class="eq-remove" aria-label="Remove row">×</button>`;
+  div.querySelector(".eq-remove").addEventListener("click", () => div.remove());
+  document.getElementById("eq-list").appendChild(div);
+}
+
+// ══════════════════════════════════════════════════════
+//  COLLECT ITEMS FROM UI
+// ══════════════════════════════════════════════════════
+function collectItems() {
+  return [...document.querySelectorAll(".eq-row")].map(row => {
+    const rawName = row.querySelector(".eq-name").value.trim();
+    const status  = row.querySelector(".eq-status").value;
+    const qty     = Math.max(1, parseInt(row.querySelector(".eq-qty").value)||1);
+    const equipKey = resolveEquip(rawName);
+    return { name: rawName, equipKey: equipKey||rawName, status, qty };
+  }).filter(it => it.name);
+}
+
+// ══════════════════════════════════════════════════════
+//  VIEW SWITCHING
+// ══════════════════════════════════════════════════════
+let currentView = "dashboard";
+function switchView(v) {
+  currentView = v;
+  document.querySelectorAll(".vtab").forEach(b => b.classList.toggle("active", b.dataset.view===v));
+  ["dashboard","gantt","table"].forEach(name => {
+    document.getElementById("view-"+name).hidden = (name !== v);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  MAIN: GENERATE MOP
+// ══════════════════════════════════════════════════════
+let currentSteps = [];
+let currentProject = {};
+
+function generateMop() {
+  const items = collectItems();
+  if (!items.length) { toast("Add at least one piece of equipment first."); return; }
+
+  const maxMin = parseInt(document.getElementById("opt-maxhours").value)||480;
+  const cutoverDay = parseInt(document.getElementById("opt-cutover").value)||0;
+  const startTime = document.getElementById("opt-start").value||"07:00";
+  currentProject = {
+    name: document.getElementById("proj-name").value.trim(),
+    country: document.getElementById("proj-country").value.trim()
+  };
+
+  // Unknown equipment warning
+  const unknown = items.filter(it => !KB[it.equipKey]);
+  if (unknown.length) toast(`Note: ${unknown.map(u=>u.name).join(", ")} not in library — using generic step.`);
+
+  const steps = generateSteps(items, cutoverDay);
+  planDays(steps, maxMin, cutoverDay);
+  currentSteps = steps;
+
+  // Update cutover select to reflect actual day count
+  const maxDay = Math.max(...steps.map(s=>s.day));
+  const cutoverSel = document.getElementById("opt-cutover");
+  const curCut = cutoverSel.value;
+  cutoverSel.innerHTML = `<option value="0">No outage</option>` +
+    Array.from({length:maxDay},(_,i)=>`<option value="${i+1}"${curCut===String(i+1)?" selected":""}>Day ${i+1}</option>`).join("");
+
+  document.getElementById("setup-phase").hidden = true;
+  document.getElementById("mop-phase").hidden  = false;
+
+  renderDashboard(steps, cutoverDay, maxMin);
+  renderGantt(steps, cutoverDay, startTime);
+  renderTable(steps);
+  switchView("dashboard");
+}
+
+// ══════════════════════════════════════════════════════
+//  EVENTS
+// ══════════════════════════════════════════════════════
+document.getElementById("btn-generate").addEventListener("click", generateMop);
+document.getElementById("btn-add-eq").addEventListener("click", () => addEquipRow());
+document.getElementById("btn-edit").addEventListener("click", () => {
+  document.getElementById("mop-phase").hidden  = true;
+  document.getElementById("setup-phase").hidden = false;
+});
+document.querySelectorAll(".vtab").forEach(b => {
+  b.addEventListener("click", () => switchView(b.dataset.view));
+});
+document.getElementById("btn-excel").addEventListener("click", async () => {
+  document.getElementById("btn-excel").disabled = true;
+  document.getElementById("btn-excel").textContent = "…";
+  await exportExcel(currentSteps, currentProject);
+  document.getElementById("btn-excel").disabled = false;
+  document.getElementById("btn-excel").textContent = "Excel";
+});
+document.getElementById("btn-pdf").addEventListener("click", async () => {
+  document.getElementById("btn-pdf").disabled = true;
+  document.getElementById("btn-pdf").textContent = "…";
+  await exportPdf(currentSteps, currentProject);
+  document.getElementById("btn-pdf").disabled = false;
+  document.getElementById("btn-pdf").textContent = "PDF";
+});
+
+// ══════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════
+// Pre-populate with one empty row
+addEquipRow();
+</script>
+</body>
+</html>

@@ -147,6 +147,8 @@ body:not([data-mode="TRM"]) .trm-only{display:none!important}
 .choice{text-align:left;border:2px solid var(--line);background:var(--field);border-radius:10px;padding:18px;cursor:pointer;display:flex;flex-direction:column;gap:6px;color:var(--ink)}
 .choice:hover{border-color:var(--amber)}
 .choice b{font:700 26px/1 var(--cond)}.choice span{font-size:13.5px;color:var(--ink-2)}
+.choice.auto-choice{grid-column:1/-1;border-color:var(--amber);text-decoration:none}
+.choice.auto-choice b{color:var(--amber)}
 .opts{display:grid;grid-template-columns:1fr;gap:6px;margin-top:8px}
 .opts .chk{margin-top:0}
 .un .kind.ant{color:var(--amber)}.un .kind.idu{color:var(--blue)}
