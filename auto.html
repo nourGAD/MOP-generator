@@ -502,28 +502,39 @@ document.getElementById('eq-text').addEventListener('input',()=>{
   const lbl = document.getElementById('mic-lbl');
   const interim = document.getElementById('mic-interim');
   const ta = document.getElementById('eq-text');
-  if (!SpeechRec) return; // not supported — button stays hidden
+  if (!SpeechRec) return;
   btn.hidden = false;
 
   const rec = new SpeechRec();
-  rec.continuous = true;
+  rec.continuous = false;      // let browser stop naturally; we restart manually
   rec.interimResults = true;
   rec.lang = 'en-US';
 
-  let listening = false;
+  // States: idle → starting → listening → stopping → idle
+  let state = 'idle';
   let finalBuffer = '';
 
-  rec.onstart = () => {
-    listening = true;
-    btn.classList.add('listening');
-    lbl.textContent = 'Stop';
-    interim.textContent = '🎤 Listening…';
+  function uiOn()  { btn.classList.add('listening'); lbl.textContent = 'Stop'; interim.textContent = '🎤 Listening…'; }
+  function uiOff() { btn.classList.remove('listening'); lbl.textContent = 'Voice'; interim.textContent = ''; }
+
+  function doStart() {
+    if (state !== 'idle') return;
+    state = 'starting';
     finalBuffer = ta.value.trim();
-  };
+    try { rec.start(); }
+    catch(e) { state = 'idle'; interim.textContent = '⚠ ' + e.message; }
+  }
+
+  function doStop() {
+    if (state === 'idle' || state === 'stopping') return;
+    state = 'stopping';
+    try { rec.abort(); } catch(_) {}
+  }
+
+  rec.onstart  = () => { state = 'listening'; uiOn(); };
 
   rec.onresult = (e) => {
-    let interimStr = '';
-    let newFinal = '';
+    let interimStr = '', newFinal = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript;
       if (e.results[i].isFinal) newFinal += t + ' ';
@@ -534,34 +545,30 @@ document.getElementById('eq-text').addEventListener('input',()=>{
       ta.value = finalBuffer;
       renderChips(parseText(ta.value));
     }
-    interim.textContent = interimStr ? `🎤 "${interimStr}"` : (listening ? '🎤 Listening…' : '');
+    interim.textContent = interimStr ? `🎤 "${interimStr}"` : '🎤 Listening…';
   };
 
-  rec.onerror = (e) => {
-    interim.textContent = e.error === 'not-allowed'
-      ? '⚠ Microphone access denied — allow mic in browser settings.'
-      : `⚠ ${e.error}`;
-    stopRec();
+  rec.onerror  = (e) => {
+    if (e.error === 'no-speech') return;   // browser timed out — onend will restart
+    if (e.error === 'not-allowed') { interim.textContent = '⚠ Mic denied — allow it in browser settings then refresh.'; state = 'stopping'; return; }
+    // other transient errors: just let onend handle restart
   };
 
   rec.onend = () => {
-    if (listening) {
-      // Browser auto-stopped (silence); restart to stay continuous
-      try { rec.start(); } catch(_) { stopRec(); }
+    if (state === 'listening' || state === 'starting') {
+      // Browser auto-stopped (silence timeout) — restart after a brief pause
+      state = 'idle';
+      setTimeout(doStart, 120);
+    } else {
+      // User pressed Stop (state = 'stopping')
+      state = 'idle';
+      uiOff();
     }
   };
 
-  function stopRec() {
-    listening = false;
-    try { rec.stop(); } catch(_) {}
-    btn.classList.remove('listening');
-    lbl.textContent = 'Voice';
-    interim.textContent = '';
-  }
-
   btn.addEventListener('click', () => {
-    if (listening) stopRec();
-    else { try { rec.start(); } catch(e) { interim.textContent = '⚠ Could not start mic: '+e.message; } }
+    if (state === 'idle') doStart();
+    else doStop();
   });
 })();
 
