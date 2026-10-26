@@ -53,9 +53,20 @@ a{color:inherit;text-decoration:none}
 .proj-row input{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:9px 10px;width:100%}
 
 .eq-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:16px}
-.eq-box-head{padding:14px 18px 10px;border-bottom:1px solid var(--shade)}
+.eq-box-head{padding:14px 18px 10px;border-bottom:1px solid var(--shade);display:flex;align-items:flex-start;gap:10px}
+.eq-box-head-text{flex:1}
 .eq-box-head b{font:700 15px var(--cond)}
 .eq-box-head p{font-size:12px;color:var(--ink-2);margin:4px 0 0}
+/* Mic button */
+.mic-btn{flex-shrink:0;display:flex;align-items:center;gap:6px;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font:700 12px var(--cond);color:var(--ink-2);transition:background .15s,border-color .15s}
+.mic-btn:hover{border-color:var(--blue);color:var(--blue)}
+.mic-btn.listening{background:rgba(217,65,65,.1);border-color:var(--red);color:var(--red);animation:pulse-mic 1.2s ease-in-out infinite}
+.mic-btn.listening .mic-ring{animation:ring-spin 1.2s linear infinite}
+.mic-icon{width:16px;height:16px;flex-shrink:0}
+.mic-ring{width:8px;height:8px;border-radius:50%;background:var(--red);display:none}
+.mic-btn.listening .mic-ring{display:block}
+.mic-interim{font-size:12px;color:var(--ink-2);font-style:italic;padding:4px 18px 0;min-height:18px}
+@keyframes pulse-mic{0%,100%{opacity:1}50%{opacity:.6}}
 .eq-textarea{width:100%;min-height:130px;border:0;padding:14px 18px;background:transparent;resize:vertical;font:500 14px/1.7 var(--sans);color:var(--ink)}
 .eq-textarea:focus{outline:none;background:rgba(26,115,232,.03)}
 .eq-textarea::placeholder{color:var(--ink-2);font-style:italic}
@@ -160,9 +171,22 @@ table.exec tr.cut-row td{background:rgba(217,65,65,.05)}
 
     <div class="eq-box">
       <div class="eq-box-head">
-        <b>Equipment list</b>
-        <p>Format: <code>QTYx New/Reuse MODEL</code> — separate items with <code>+</code> or new lines. Bands and notes in parentheses are fine.</p>
+        <div class="eq-box-head-text">
+          <b>Equipment list</b>
+          <p>Format: <code>QTYx New/Reuse MODEL</code> — separate items with <code>+</code> or new lines. Bands and notes in parentheses are fine.</p>
+        </div>
+        <button class="mic-btn" id="mic-btn" title="Speak your equipment list" hidden>
+          <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="2" width="6" height="11" rx="3"/>
+            <path d="M5 10a7 7 0 0 0 14 0"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+            <line x1="8" y1="22" x2="16" y2="22"/>
+          </svg>
+          <span class="mic-ring"></span>
+          <span id="mic-lbl">Voice</span>
+        </button>
       </div>
+      <div class="mic-interim" id="mic-interim"></div>
       <textarea class="eq-textarea" id="eq-text" placeholder="Examples:
 3x New Radio 4486 B8B20B28 + 3x New Radio 4490 B1B3 + 3x AIR 3219 B42
 1x Reuse BB5212 (3G) + 1x New RP6655 (4G+5G)
@@ -468,6 +492,78 @@ document.getElementById('eq-text').addEventListener('input',()=>{
   const items = parseText(document.getElementById('eq-text').value);
   renderChips(items);
 });
+
+// ════════════════════════════════════════════════
+//  VOICE INPUT
+// ════════════════════════════════════════════════
+(function(){
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = document.getElementById('mic-btn');
+  const lbl = document.getElementById('mic-lbl');
+  const interim = document.getElementById('mic-interim');
+  const ta = document.getElementById('eq-text');
+  if (!SpeechRec) return; // not supported — button stays hidden
+  btn.hidden = false;
+
+  const rec = new SpeechRec();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-US';
+
+  let listening = false;
+  let finalBuffer = '';
+
+  rec.onstart = () => {
+    listening = true;
+    btn.classList.add('listening');
+    lbl.textContent = 'Stop';
+    interim.textContent = '🎤 Listening…';
+    finalBuffer = ta.value.trim();
+  };
+
+  rec.onresult = (e) => {
+    let interimStr = '';
+    let newFinal = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) newFinal += t + ' ';
+      else interimStr += t;
+    }
+    if (newFinal) {
+      finalBuffer = (finalBuffer ? finalBuffer + '\n' : '') + newFinal.trim();
+      ta.value = finalBuffer;
+      renderChips(parseText(ta.value));
+    }
+    interim.textContent = interimStr ? `🎤 "${interimStr}"` : (listening ? '🎤 Listening…' : '');
+  };
+
+  rec.onerror = (e) => {
+    interim.textContent = e.error === 'not-allowed'
+      ? '⚠ Microphone access denied — allow mic in browser settings.'
+      : `⚠ ${e.error}`;
+    stopRec();
+  };
+
+  rec.onend = () => {
+    if (listening) {
+      // Browser auto-stopped (silence); restart to stay continuous
+      try { rec.start(); } catch(_) { stopRec(); }
+    }
+  };
+
+  function stopRec() {
+    listening = false;
+    try { rec.stop(); } catch(_) {}
+    btn.classList.remove('listening');
+    lbl.textContent = 'Voice';
+    interim.textContent = '';
+  }
+
+  btn.addEventListener('click', () => {
+    if (listening) stopRec();
+    else { try { rec.start(); } catch(e) { interim.textContent = '⚠ Could not start mic: '+e.message; } }
+  });
+})();
 
 // ════════════════════════════════════════════════
 //  STEP ENGINE
