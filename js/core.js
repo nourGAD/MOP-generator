@@ -1195,8 +1195,7 @@
     const lastDay = sites.length ? new Date(Math.max(...plan.map(x => x.end.getTime()))) : new Date(P.startDate + "T00:00:00Z");
     const allOk = types.every(t => t.sch.outOk);
     const cards = [[Us.toUpperCase(), `SUM(D${T0}:D${TL})`, sites.length, "0", "1F77B4"], [`${U1.toUpperCase()}-DAYS`, `SUMPRODUCT(D${T0}:D${TL},E${T0}:E${TL})`, siteDays, "0", "0F766E"],
-      ["MAX OUTAGE", `MAX(${CL(cOut)}${T0}:${CL(cOut)}${TL})`, Math.max(...types.map(t => t.sch.outage)) / 1440, "[h]:mm", "C92A2A"],
-      ["🏁 PROJECT FINISH", xl(lastDay), xl(lastDay), "dd-mmm-yy", "F59F00"]];
+      ["MAX OUTAGE", `MAX(${CL(cOut)}${T0}:${CL(cOut)}${TL})`, Math.max(...types.map(t => t.sch.outage)) / 1440, "[h]:mm", "C92A2A"]];
     cards.forEach(([lab, f, v, nf, col], i) => {
       const c = 5 + i * 2;
       db.mergeCells(5, c, 5, c + 1); db.mergeCells(6, c, 8, c + 1);
