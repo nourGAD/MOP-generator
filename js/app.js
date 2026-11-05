@@ -41,7 +41,7 @@ function renderInputs(){
   $("#types").innerHTML=S.types.map((t,i)=>`
    <div class="tcard" style="--c:${COL(i)}" data-i="${i}">
     <div class="head"><label class="f">Name<input type="text" data-t="name" value="${esc(t.name)}"></label>
-      <label class="f">${TRMm()?"Links":"Sites"}<input type="number" min="0" data-t="sites" value="${t.sites}"></label>
+      <label class="f">${TRMm()?'No. of Sites (MW links)':'Sites'}<input type="number" min="0" data-t="sites" value="${t.sites}"></label>
       <button class="x" data-del="${i}" aria-label="Remove ${esc(t.name)}" title="Remove">×</button></div>
     ${!TRMm()?`<div class="twr"><label class="f">Tower type<input type="text" list="towerTypes" data-t="towerType" value="${esc(t.towerType||'Monopole')}" placeholder="GF / Rooftop / Monopole / Lattice"></label>
       <label class="f">Height&nbsp;(m)<input type="number" min="5" max="300" step="5" data-t="towerHeight" data-num="1" value="${+t.towerHeight||30}"></label></div>
