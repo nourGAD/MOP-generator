@@ -658,6 +658,7 @@
     new:     { label: "New link (no outage)",              days: 4, minDays: 1 },
     normal:  { label: "Normal swap (1 team, cold)",        days: 4, minDays: 1 },
     hot:     { label: "Hot swap (2 teams, both ends)",     days: 3, minDays: 1 },
+    out2:    { label: "Outdoor swap / upgrade, 2 teams",  days: 3, minDays: 1 },
     upg:     { label: "1+0 → 2+0 upgrade (add radio)",    days: 3, minDays: 1 },
     idu:     { label: "IDU / NPU swap only",               days: 2, minDays: 1 },
     radswap: { label: "Outdoor radio swap only (1 h outage)", days: 2, minDays: 1 },
@@ -668,7 +669,7 @@
     if (["new","dism"].includes(m)) return 0;
     if (+d === 1) return 1;              // 1-day MOP: outage always on day 1
     if (m === "normal") return +d - 1;  // 4→3, 3→2
-    if (m === "hot" || m === "upg") return 2;
+    if (m === "hot" || m === "out2" || m === "upg") return 2;
     if (m === "idu") return 1;
     if (m === "radswap") return +d;     // 2→2
     return 0;
@@ -862,6 +863,39 @@
       c.push(A("lv", "Confirm with NOC & leave", "NOC confirms all services up; leave site", "Team A + Team B", F.leave, ["lrf", "bka", "pm"]));
       days.push({ title: "⚡ DAY 2 – HARDWARE HOT SWAP, ALIGNMENT & MIGRATION", acts: c, cut: true });
       days.push({ title: "✅ DAY 3 – DECOMMISSIONING, QA & VSS / VCOP", acts: qaDay(true) });
+    } else if (m === "out2") {
+      // DAY 1 – Preparation both ends, no impact
+      const L = start("a", true, true).map(a => Object.assign(a, { who: a.who === "All" ? "Team A + Team B" : a.who }));
+      L[0].desc += " (two teams, one per end)";
+      L.push(A("arfi", "RFI check (both ends)", "Check RFI as per scope & design at both ends", TL, F.rfi, ["aehs"]));
+      L.push(A("apre", "Pre-check & outage plan", "Pre-check print screens; share outage plan with expected migration date for IM approval", FE, F.precheck, ["aehs"]));
+      L.push(A("abk", "Backup existing TN", "Take and save existing Mini-Link TN backup and report, print screens and overview photos", FE, F.backup, ["aehs"]));
+      L.push(A("aasm", "Assemble new dish & radio (both ends)", `Assemble ${listTxt(ANT.concat(RAD), false) || "new dish & radio units"} on ground – both NE and FE dishes assembled and ready for lifting; other hardware installed and ready for cutover`, RG, F.assemble + antMin + radMin, ["arfi"]));
+      if (iduN) L.push(A("apidu", "Prepare new ML 66xx / IDU", `Prepare ${listTxt(IDU, false)} with required cards`, FE, F.prepIdu, ["arfi"]));
+      L.push(A("agng", "GO / NO-GO for dish swap", "Confirm go-ahead: both ends assembled and ready for cutover; nothing proceeds without this confirmation", TL, F.gng, ["abk", "aasm"]));
+      L.push(A("aout", "Logout with NOC", "Confirm status; both ends ready for swap day", "All", F.logout, ["agng"]));
+      days.push({ title: "🔧 DAY 1 – PREPARATION, BOTH ENDS IN PARALLEL (no impact)", acts: L });
+      // DAY 2 – Outage, dish swap, alignment, migration
+      const c = start("c", true, false).map(a => Object.assign(a, { who: a.who === "All" ? "Team A + Team B" : a.who }));
+      c.push(A("noc", "NOC confirms outage window", "Call NOC for outage window confirmation to start; ensure customer MS person is on-site at both ends", TL, F.nocStart, ["cehs"], "Outage", "🔴 OUTAGE STARTS – Ensure customer MS person attending before proceeding", { atOutage: true }));
+      c.push(A("dd", "Disconnect IF & lower old dish", "Disconnect existing IF cables from existing IDU; dismantle old MW dish only and get it down to ground. Keep old IF cables installed on tower during the entire activity.", RG, F.discDish, ["noc"], "Outage", "⚠️ Keep old IF cables on tower – do NOT remove them (needed for rollback)"));
+      c.push(A("nd", "Hoist & install new dish & radio", `Hoist and install new MW dish and ${listTxt(RAD, true) || "radio units"} on tower per LB on approved tower location`, RG, antMin + radMin, ["dd"], "Outage"));
+      c.push(A("cr", "Connect & verify radio cables", "Connect radio cables to radio units according to identifying labels on each one; confirm hardware visibility in software inventory", FE, F.connRad, ["nd"], "Outage"));
+      c.push(A("rel", "Radio release check & upgrade", "Check release for radio units; do proper upgrade to desired version if required", FE, F.relChk, ["cr"], "Outage"));
+      c.push(A("cf", "Configure new ML & radio units", "Configure new ML and radio units with approved LB configurations", FE, F.cfg, ["cr"], "Outage"));
+      c.push(A("int", "Interference test (both ends)", "Perform interference test on both ends and save print screen. ⛔ Revert immediately to Planning/Project in case of interference – do NOT proceed with alignment.", FE, Math.round(F.txOn / 2), ["rel", "cf"], "Outage", "🔴 Interference = STOP – revert to planning immediately, do NOT align"));
+      c.push(A("tx", "Switch Tx on & SW RF loop", "Switch on Tx on each radio unit and perform software RF loop for radio testing", FE, Math.round(F.txOn / 2), ["int"], "Outage", "Rollback if Tx won't come up: reconnect old IF cables and reinstall old dish at marked position"));
+      c.push(A("aln", "Link alignment & recheck interference", "Align link and recheck interference – achieve required RSL as per LB. Rollback: if activity cannot finish same day, reinstall old dish at marked position and reconnect old IF cables per labels.", RG + " + FE", F.alignHot + (sd ? F.alignSD : 0), ["tx"], "Outage", sd ? "Includes Main-Div (SD) alignment" : ""));
+      c.push(A("lrf", "Share LRF / RMM fingerprint", "Share license request file (LRF) and RMM fingerprint to IM for license processing", FE, F.lrf, ["aln"], "Outage"));
+      c.push(A("xp", "XPI check & fine tuning", "Check XPI values and do XPI fine tuning if required to achieve accepted XPI levels", FE, Math.round(F.xpi / 2), ["aln"], "Outage"));
+      c.push(A("cnf", "Confirm performance values", "Confirm that desired modulation, capacity, RSL and XPI values have been achieved", FE, F.confirm, ["xp"], "Outage"));
+      c.push(A("tra", "DCN / VLAN / traffic migration", "Confirm DCN and VLAN configurations; check and confirm node visibility on ENM; configure traffic to restore 2G, 3G, LTE 4G and all affected services. Use only Customer-assigned TX ports (LAN/Optical).", INT + " + FE", F.trafficHot, ["cnf"], "Outage"));
+      c.push(A("up", "NOC confirms all sites up", "Call NOC to confirm traffic migration; all sites (local + dependent) are up", "NOC + " + TL, F.confirmUp, ["xp", "tra"], "Outage", "🟢 OUTAGE ENDS – rollback if not OK: reinstall old dish at marked position, reconnect old IF cables"));
+      c.push(A("bka", "Backup & config after", "Take all backup reports and config files", FE, F.backupAfter, ["up"]));
+      c.push(A("pm", "Clear PM logs", "Clear performance logs and cache for 24h performance approval", FE, F.clearPm, ["bka"]));
+      c.push(A("lv", "Confirm with NOC & leave", "NOC confirms all services / sites up; leave site", "Team A + Team B", F.leave, ["lrf", "bka", "pm"]));
+      days.push({ title: "⚡ DAY 2 – DISH SWAP, ALIGNMENT & MIGRATION", acts: c, cut: true });
+      days.push({ title: "✅ DAY 3 – DECOMMISSIONING, QA & VSS / VCOP", acts: qaDay(true) });
     } else if (m === "upg") {
       const L = start("a", false, true);
       L.push(A("arfi", "RFI check – Site A", "Check RFI as per scope & design", TL, F.rfi, ["aehs"]));
@@ -912,7 +946,7 @@
       c.push(A("sw", "SW upgrade", "ML 66xx SW upgrade", FE, F.swup, ["ne"]));
       c.push(A("bk", "Backup, report & photos", "Save existing IDU backup, report, print screens, photos", FE, F.backup, ["sw", "pre", "lab"]));
       c.push(A("gng", "GO / NO-GO for IDU swap", "Confirm go-ahead for IDU upgrade", TL, F.gng, ["bk"], "", "Rollback: reconnect relocated HW as before"));
-      c.push(A("noc", "NOC confirms outage start", "Call NOC for outage window", TL, F.nocStart, ["gng"], "Outage", "🔴 OUTAGE STARTS – not before approved start", { atOutage: true }));
+      c.push(A("noc", "NOC confirms outage start", "Call NOC for outage window; ensure customer MS person is on-site", TL, F.nocStart, ["gng"], "Outage", "🔴 OUTAGE STARTS – not before approved start; ensure customer MS person attending", { atOutage: true }));
       c.push(A("rel", "Move cables to new IDU", "Disconnect from old IDU, relocate to new IDU per planned ports (radio, ethernet, fiber)", FE, F.relocIdu, ["noc"], "Outage"));
       c.push(A("mmu", "Configure MMU / radio as before", "Configure MMU and radio with same parameters to restore links", FE, F.cfgMmu, ["rel"], "Outage"));
       c.push(A("tra", "WAN / VLAN / traffic", "WAN up, add to DCN & traffic VLANs, ENM visibility, restore traffic", INT + " + FE", F.traffic * 2 / 3, ["mmu"], "Outage"));
