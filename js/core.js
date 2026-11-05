@@ -88,7 +88,16 @@
       s.project = Object.assign({}, DEFAULT_TRM().project, x.project || {});
       s.fixed = Object.assign({}, DEFAULT_TRM().fixed, x.fixed || {}); s.unit = Object.assign({}, DEFAULT_TRM().unit, x.unit || {});
       if (!Array.isArray(s.types) || !s.types.length) s.types = DEFAULT_TRM().types;
-      s.types.forEach(t => { if (!TRM_METHODS[t.method]) t.method = "normal"; if (!Array.isArray(t.units)) t.units = []; if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, afterOf: {}, add: [] }; if (!t.edits.afterOf) t.edits.afterOf = {}; });
+      s.types.forEach(t => {
+        if (!TRM_METHODS[t.method]) t.method = "normal";
+        if (!Array.isArray(t.units)) t.units = [];
+        if (!t.edits) t.edits = { rm: {}, mv: {}, dur: {}, afterOf: {}, add: [] };
+        if (!t.edits.afterOf) t.edits.afterOf = {};
+        const md = TRM_METHODS[t.method] || TRM_METHODS.normal;
+        if (!t.days || ![1,2,3,4].includes(+t.days)) t.days = md.days;
+        t.days = Math.min(md.days, Math.max(md.minDays, +t.days));
+        if (t.outageDay === undefined || t.outageDay === null) t.outageDay = trmNatOutageDay(t.method, t.days);
+      });
       if (typeof s.d0 !== "string") s.d0 = DEFAULT_TRM().d0;
       return s;
     }
@@ -646,14 +655,23 @@
     ["labels", "Check cable labels for relocation", 30], ["relocIdu", "Move cables from old IDU to new IDU", 30], ["cfgMmu", "Configure MMU / radio as before", 30],
   ];
   const TRM_METHODS = {
-    new: { label: "New link (no outage)", days: 4 },
-    normal: { label: "Normal swap (1 team, cold)", days: 4 },
-    hot: { label: "Hot swap (2 teams, both ends)", days: 3 },
-    upg: { label: "1+0 → 2+0 upgrade (add radio)", days: 3 },
-    idu: { label: "IDU / NPU swap only", days: 2 },
-    radswap: { label: "Outdoor radio swap only (1 h outage)", days: 2 },
-    dism: { label: "Dismantling only (no outage)", days: 1 },
+    new:     { label: "New link (no outage)",              days: 4, minDays: 3 },
+    normal:  { label: "Normal swap (1 team, cold)",        days: 4, minDays: 3 },
+    hot:     { label: "Hot swap (2 teams, both ends)",     days: 3, minDays: 3 },
+    upg:     { label: "1+0 → 2+0 upgrade (add radio)",    days: 3, minDays: 3 },
+    idu:     { label: "IDU / NPU swap only",               days: 2, minDays: 2 },
+    radswap: { label: "Outdoor radio swap only (1 h outage)", days: 2, minDays: 1 },
+    dism:    { label: "Dismantling only (no outage)",      days: 1, minDays: 1 },
   };
+  /* Compute the natural outage day index (1-based) for a given method+days combo */
+  function trmNatOutageDay(m, d) {
+    if (["new","dism"].includes(m)) return 0;
+    if (m === "normal") return +d - 1;   // 4→3, 3→2
+    if (m === "hot" || m === "upg") return 2;
+    if (m === "idu") return 1;
+    if (m === "radswap") return +d;      // 2→2, 1→1
+    return 0;
+  }
   const trmCat = u => /\b(ant|antenna|dish|hpx?|vhlp|sb\d)/i.test(`${u.role} ${u.model}`) ? "ant"
     : /\b(idu|npu|mmu|optix|odf)\b|ml ?66\d\d|669\d/i.test(`${u.role} ${u.model}`) ? "idu" : "rad";
   const DEFAULT_TRM = () => ({
@@ -688,6 +706,8 @@
 
   function trmActivities(state, t, raw) {
     const F = state.fixed, U = state.unit, m = TRM_METHODS[t.method] ? t.method : "normal";
+    // compact = true when user selected fewer days than the method's default
+    const compact = +t.days < (TRM_METHODS[m].days || 4);
     const all = unitsOf(t), ANT = all.filter(u => trmCat(u) === "ant"), RAD = all.filter(u => trmCat(u) === "rad"), IDU = all.filter(u => trmCat(u) === "idu");
     const antMin = sumMin(ANT), radMin = sumMin(RAD), iduN = sumQ(IDU), nRad = sumQ(RAD), hasAnt = ANT.length > 0, sd = !!t.sd;
     const cab = t.reuseCabling ? 0 : Math.max(nRad, 1) * U.cableRadio;
@@ -763,7 +783,7 @@
     };
     const days = [];
     if (m === "new") {
-      if (t.compact) {
+      if (compact) {
         const L = endBlock("a", "Site A", true);
         L.push(A("mv", "Move to Site B", "Logout Site A and move to far-end site", "All", F.travel, ["aout"]));
         L.push(...endBlock("b", "Site B", false, "mv"));
@@ -787,7 +807,7 @@
       const q = qaDay(false); q.forEach(a => { if (!["qacc", "qehs", "qlo"].includes(a.key)) { a.group = "qa"; a.allow = [days.length, days.length + 1]; } });
       days.push({ title: `✅ DAY ${days.length + 1} – QA, VSS / VCOP SESSIONS`, acts: q });
     } else if (m === "normal") {
-      if (t.compact) {
+      if (compact) {
         const L = endBlock("a", "Site A", true);
         L.push(A("mv", "Move to Site B", "Logout Site A and move to far-end site", "All", F.travel, ["aout"]));
         L.push(...endBlock("b", "Site B", false, "mv"));
@@ -903,7 +923,7 @@
       days.push({ title: "⚡ DAY 1 – PREPARATION & IDU / NPU SWAP", acts: c, cut: true });
       days.push({ title: "✅ DAY 2 – QA, VSS / VCOP SESSIONS", acts: qaDay(false) });
     } else if (m === "radswap") {
-      if (!t.compact) {
+      if (!compact) {
         const L = start("a", false, true);
         L.push(A("arfi","RFI check","Check RFI; confirm new radio bracket position",TL,F.rfi,["aehs"]));
         L.push(A("aasm","Assemble new radio",`Assemble ${listTxt(RAD,false)||"new radio"} on ground`,RG,F.assemble/2,["arfi"]));
@@ -914,14 +934,14 @@
         L.push(A("aout","Logout with NOC","Confirm status; both ends ready for swap","All",F.logout,["acab","acfg"]));
         days.push({ title: "🔧 DAY 1 – RADIO PRE-INSTALLATION, BOTH ENDS (no impact)", acts: L });
       }
-      const c2 = start("c", !t.compact, !t.compact ? false : true);
-      if (t.compact) {
+      const c2 = start("c", !compact, !compact ? false : true);
+      if (compact) {
         c2.push(A("crfi","RFI check","Check RFI; confirm bracket position",TL,F.rfi,["cehs"]));
         c2.push(A("casm","Assemble & install new radio",`Install ${listTxt(RAD,true)} (old radio stays active)`,RG,F.assemble/2+radMin,["crfi"]));
         c2.push(A("ccab","Route new IF cable","Route new IF cable; do NOT connect yet",RG,Math.round(cab/2),["casm"]));
         c2.push(A("ccfg","Pre-configure new radio","Configure with approved LB (Tx off)",FE,F.cfg,["casm"]));
       }
-      c2.push(A("bk","Backup & pre-check","Save TN backup, report, print screens; confirm new radio ready both ends",FE,F.backup,t.compact?["ccfg","ccab"]:["cehs"]));
+      c2.push(A("bk","Backup & pre-check","Save TN backup, report, print screens; confirm new radio ready both ends",FE,F.backup,compact?["ccfg","ccab"]:["cehs"]));
       c2.push(A("gng","GO / NO-GO","New radio installed and pre-configured at both ends; NOC online",TL,F.gng,["bk"]));
       c2.push(A("noc","NOC confirms outage start","Call NOC – max 1-hour outage",TL,F.nocStart,["gng"],"Outage","🔴 OUTAGE STARTS – max 1 hour",{atOutage:true}));
       c2.push(A("conn","Connect IF to new radio","Disconnect IF from old radio → connect to new radio (both ends in parallel if 2 teams)",RG,F.connRad,["noc"],"Outage"));
@@ -1043,7 +1063,7 @@
     types.forEach((t, ti) => {
       const ws = tws[ti], last = G0 + NS - 1, S = t.sch;
       banner(ws, `MOP ${t.name}  |  ${equipTxt(t)}`,
-        TRM ? `${(TRM_METHODS[t.method] || TRM_METHODS.normal).label}${t.compact && t.method === "normal" ? " – both ends on Day 1" : ""}${t.sd ? "   •   Space diversity" : ""}   •   Links: ${t.sites}   •   ${t.sch.days.length} days per link   •   Qty per link end   •   Blue = edit   •   Outage start & allowed hours on Dashboard` : `BB: ${bbText(t)}${(t.rbs || []).filter(r => r.type && +r.qty > 0).length ? "   •   RBS: " + t.rbs.filter(r => r.type && +r.qty > 0).map(r => r.qty + "x " + r.type).join(" + ") : ""}   •   Sites: ${t.sites}   •   ${ND} days per site   •   Day-time work only   •   Blue = edit   •   Outage start & allowed hours on Dashboard${t.reuseCabling ? "   •   Existing cabling reused" : ""}${t.towerType&&t.towerType!=="none"?"   •   "+(t.towerType||"—")+" "+(t.towerHeight||30)+"m":""}`, last);
+        TRM ? `${(TRM_METHODS[t.method] || TRM_METHODS.normal).label}${+t.days < (TRM_METHODS[t.method]||TRM_METHODS.normal).days ? " – " + t.days + " days" : ""}${t.sd ? "   •   Space diversity" : ""}   •   Links: ${t.sites}   •   ${t.sch.days.length} days per link   •   Qty per link end   •   Blue = edit   •   Outage start & allowed hours on Dashboard` : `BB: ${bbText(t)}${(t.rbs || []).filter(r => r.type && +r.qty > 0).length ? "   •   RBS: " + t.rbs.filter(r => r.type && +r.qty > 0).map(r => r.qty + "x " + r.type).join(" + ") : ""}   •   Sites: ${t.sites}   •   ${ND} days per site   •   Day-time work only   •   Blue = edit   •   Outage start & allowed hours on Dashboard${t.reuseCabling ? "   •   Existing cabling reused" : ""}${t.towerType&&t.towerType!=="none"?"   •   "+(t.towerType||"—")+" "+(t.towerHeight||30)+"m":""}`, last);
       navbar(ws, 3);
       hdr(ws, 6, 1, ["SN", "Activity", "What to do", "Who", "Impact", "After SN", "Dur (min)", "Start", "End", "Remarks"]);
       ws.mergeCells(6, G0, 6, last); put(ws, 6, G0, "🕒 TIME MAPPING (30-min slots from team arrival)", { font: { bold: true, ...WHITEF }, fill: HDR, al: CEN });
@@ -1389,7 +1409,7 @@
     _tailBalance(state,tt,base,raw,score);
     return base;
   }
-  const api = { cabF, towF, rigF, listBalanceGroups, autoBalanceGroups, RAN_EXTRA_LIST, RAN_SCEN, autoBalance, removedSteps, planDates, DEFAULT_TRM, TRM_FIXED, TRM_METHODS, trmCat, isAir, equipTxt, unitsOf, buildPdf, leadMin, cutArrive, WEEKEND, sub, bbText, bbNames, finishDate, normalize, daysOf, cutDayOf, DEFAULT_STATE, FIXED, schedule, activities, sitesOf, buildWorkbook, fmt, clock, hm, COLORS };
+  const api = { cabF, towF, rigF, listBalanceGroups, autoBalanceGroups, RAN_EXTRA_LIST, RAN_SCEN, autoBalance, removedSteps, planDates, DEFAULT_TRM, TRM_FIXED, TRM_METHODS, trmNatOutageDay, trmCat, isAir, equipTxt, unitsOf, buildPdf, leadMin, cutArrive, WEEKEND, sub, bbText, bbNames, finishDate, normalize, daysOf, cutDayOf, DEFAULT_STATE, FIXED, schedule, activities, sitesOf, buildWorkbook, fmt, clock, hm, COLORS };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.MOP = api;
 })(typeof window !== "undefined" ? window : globalThis);
 

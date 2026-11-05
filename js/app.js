@@ -50,7 +50,8 @@ function renderInputs(){
       <label class="f">Days<select data-t="days" data-num="1">${(M.RAN_SCEN[t.scenario]||M.RAN_SCEN.swap).days.map(d=>`<option value="${d}" ${+t.days===d?"selected":""}>${d} day${d>1?"s":""}</option>`).join("")}</select></label>
       ${t.scenario==="swap"?`<label class="f">Cutover day<select data-t="outageDay" data-num="1"><option value="0" ${+t.outageDay===0?"selected":""}>No outage</option>${Array.from({length:+t.days},(_,j)=>`<option value="${j+1}" ${+t.outageDay===j+1?"selected":""}>Day ${j+1}</option>`).join("")}</select></label>`:t.scenario==="exp"&&+t.days>1?`<label class="f">Cutover day<select data-t="outageDay" data-num="1">${Array.from({length:+t.days},(_,j)=>`<option value="${j+1}" ${+t.outageDay===j+1?"selected":""}>Day ${j+1}</option>`).join("")}</select></label>`:""}</div>`:""}
     ${TRMm()?`<div class="opts"><label class="f">Swap method<select data-t="method">${Object.entries(M.TRM_METHODS).map(([k,v])=>`<option value="${k}" ${t.method===k?"selected":""}>${esc(v.label)}</option>`).join("")}</select></label>
-      ${["normal","new","radswap"].includes(t.method)?`<label class="chk"><input type="checkbox" data-t="compact" ${t.compact?"checked":""}> Install both ends on Day 1 (small antennas)</label>`:""}
+      ${(()=>{const md=M.TRM_METHODS[t.method]||M.TRM_METHODS.normal;const minD=md.minDays||md.days;const maxD=md.days;if(minD<maxD){return `<label class="f">Days<select data-t="days" data-num="1">${Array.from({length:maxD-minD+1},(_,j)=>minD+j).map(d=>`<option value="${d}" ${+t.days===d?"selected":""}>${d} day${d>1?"s":""}</option>`).join("")}</select></label>`}return `<label class="f hint sm">Days: ${maxD}</label>`;})()}
+      ${(()=>{const od=+t.outageDay;const hasOutage=M.trmNatOutageDay(t.method,t.days)>0||od>0;if(!hasOutage)return `<label class="f hint sm">No outage</label>`;const days=+t.days;return `<label class="f">Cutover day<select data-t="outageDay" data-num="1">${Array.from({length:days},(_,j)=>`<option value="${j+1}" ${od===j+1?"selected":""}>Day ${j+1}</option>`).join("")}</select></label>`;})()}
       <label class="chk"><input type="checkbox" data-t="sd" ${t.sd?"checked":""}> Space diversity (SD) – adds Main-Div alignment</label></div>`:""}
     ${!TRMm()?`<div class="rbs-bb-wrap">
       <div class="uh rbh"><span>RBS / cabinet</span><span>Qty</span><span>Min/unit</span><span></span></div>
@@ -189,7 +190,17 @@ document.addEventListener("input",e=>{
     if(["towerType","towerHeight"].includes(el.dataset.t)){
       const ci=+el.closest(".tcard").dataset.i; S.types[ci][el.dataset.t]=el.dataset.num?+el.value:el.value;
       renderInputs();render();updCut();return}
-    if(["method","scenario","days","compact"].includes(el.dataset.t)){ if(el.dataset.t==="scenario"){tt.days=M.RAN_SCEN[v].def; tt.outageDay=Math.min(tt.outageDay||2,tt.days); if(v==="exp")tt.outageDay=tt.days} if(el.dataset.t==="days"){if(+tt.outageDay>+v){tt.outageDay=+v} if(tt.scenario==="exp"){tt.outageDay=+v}} tt.edits={rm:{},mv:{},dur:{},add:[]}; sel=i; renderInputs(); if(el.dataset.t!=="days"&&el.dataset.t!=="compact") toast("Template changed – step edits for this type were reset."); } updCut()}
+    if(["method","scenario","days","outageDay","compact"].includes(el.dataset.t)){
+      if(TRMm()){
+        if(el.dataset.t==="method"){const md=M.TRM_METHODS[v]||M.TRM_METHODS.normal;tt.days=md.days;tt.outageDay=M.trmNatOutageDay(v,tt.days);tt.edits={rm:{},mv:{},dur:{},add:[]};sel=i;renderInputs();toast("Template changed – step edits for this type were reset.");}
+        else if(el.dataset.t==="days"){const nv=+v;tt.days=nv;tt.outageDay=M.trmNatOutageDay(tt.method,nv);tt.edits={rm:{},mv:{},dur:{},add:[]};sel=i;renderInputs();}
+        else if(el.dataset.t==="outageDay"){/* value already set above */}
+      } else {
+        if(el.dataset.t==="scenario"){tt.days=M.RAN_SCEN[v].def; tt.outageDay=Math.min(tt.outageDay||2,tt.days); if(v==="exp")tt.outageDay=tt.days}
+        if(el.dataset.t==="days"){if(+tt.outageDay>+v){tt.outageDay=+v} if(tt.scenario==="exp"){tt.outageDay=+v}}
+        tt.edits={rm:{},mv:{},dur:{},add:[]}; sel=i; renderInputs(); if(el.dataset.t!=="days"&&el.dataset.t!=="compact") toast("Template changed – step edits for this type were reset.");
+      }
+    } updCut()}
   else if(el.dataset.k){const i=+el.closest(".eq").dataset.e, old=S.equipment[i].model; S.equipment[i][el.dataset.k]=v;
     if(el.dataset.k==="model") S.types.forEach(t=>(t.units||[]).forEach(u=>{if(u.model===old)u.model=v}));
     if(el.dataset.k!=="min"){ clearTimeout(window._rr); window._rr=setTimeout(()=>{const a=document.activeElement;renderInputs();},600);} }
