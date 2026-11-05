@@ -655,21 +655,22 @@
     ["labels", "Check cable labels for relocation", 30], ["relocIdu", "Move cables from old IDU to new IDU", 30], ["cfgMmu", "Configure MMU / radio as before", 30],
   ];
   const TRM_METHODS = {
-    new:     { label: "New link (no outage)",              days: 4, minDays: 3 },
-    normal:  { label: "Normal swap (1 team, cold)",        days: 4, minDays: 3 },
-    hot:     { label: "Hot swap (2 teams, both ends)",     days: 3, minDays: 3 },
-    upg:     { label: "1+0 → 2+0 upgrade (add radio)",    days: 3, minDays: 3 },
-    idu:     { label: "IDU / NPU swap only",               days: 2, minDays: 2 },
+    new:     { label: "New link (no outage)",              days: 4, minDays: 1 },
+    normal:  { label: "Normal swap (1 team, cold)",        days: 4, minDays: 1 },
+    hot:     { label: "Hot swap (2 teams, both ends)",     days: 3, minDays: 1 },
+    upg:     { label: "1+0 → 2+0 upgrade (add radio)",    days: 3, minDays: 1 },
+    idu:     { label: "IDU / NPU swap only",               days: 2, minDays: 1 },
     radswap: { label: "Outdoor radio swap only (1 h outage)", days: 2, minDays: 1 },
     dism:    { label: "Dismantling only (no outage)",      days: 1, minDays: 1 },
   };
   /* Compute the natural outage day index (1-based) for a given method+days combo */
   function trmNatOutageDay(m, d) {
     if (["new","dism"].includes(m)) return 0;
-    if (m === "normal") return +d - 1;   // 4→3, 3→2
+    if (+d === 1) return 1;              // 1-day MOP: outage always on day 1
+    if (m === "normal") return +d - 1;  // 4→3, 3→2
     if (m === "hot" || m === "upg") return 2;
     if (m === "idu") return 1;
-    if (m === "radswap") return +d;      // 2→2, 1→1
+    if (m === "radswap") return +d;     // 2→2
     return 0;
   }
   const trmCat = u => /\b(ant|antenna|dish|hpx?|vhlp|sb\d)/i.test(`${u.role} ${u.model}`) ? "ant"
@@ -968,6 +969,22 @@
       L2.push(A("avss","Final photos & VSS / VCOP","Upload QA & dismantling photos; submit to RSC",FE,F.vss,["apack"]));
       L2.push(A("aout","Confirm with NOC & leave","Confirm site cleared; close PTW; inform NOC","All",F.leave,["avss"]));
       days.push({ title: "🏗 DAY 1 – DISMANTLING, BOTH ENDS (no outage, ~3 h per end)", acts: L2 });
+    }
+    // Collapse to user's requested day count (e.g. 1-day MOP)
+    const targetDays = Math.max(1, +t.days);
+    if (targetDays < days.length) {
+      while (days.length > targetDays) {
+        const last = days.pop();
+        const prev = days[days.length - 1];
+        prev.acts = prev.acts.concat(last.acts);
+        if (last.cut) { prev.cut = true; }
+      }
+      // Re-title the collapsed days
+      days.forEach((d, i) => {
+        const hasOut = d.cut;
+        const pref = hasOut ? "⚡" : d.title.startsWith("✅") ? "✅" : "🔧";
+        d.title = `${pref} DAY ${i + 1}${hasOut ? " – OUTAGE" : ""} (compressed ${targetDays}-day MOP)`;
+      });
     }
     return raw ? days : finalize(state, t, days);
   }
