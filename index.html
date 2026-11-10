@@ -34,6 +34,7 @@
   <button class="ghost" id="exp" title="Save all inputs as a file to share with the team">Save setup</button>
   <label class="ghost" id="impl" title="Load a setup file">Load setup<input type="file" id="imp" accept=".json,application/json" hidden></label>
   <button class="ghost" id="reset" title="Restore the default setup">Reset</button>
+  <button class="ghost" id="dmToggle" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
   <button class="gen alt" id="pdf" title="Short, easy-to-read MOP for the field team">PDF</button>
   <button class="gen" id="gen">Download Excel MOP</button>
 </header>
@@ -101,6 +102,7 @@
 <datalist id="stepLib"></datalist>
 
 <script src="vendor/exceljs.min.js"></script>
+<script src="vendor/qrcode.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/jspdf.plugin.autotable.min.js"></script>
 <script src="js/core.js"></script>

@@ -1098,10 +1098,11 @@
     const used = new Set(["Dashboard", "Connections"]);
     types.forEach((t, i) => { let b = String(t.name || `Type-${i + 1}`).replace(/[*?:\\/\[\]']/g, "-").slice(0, 28).trim() || `Type-${i + 1}`, n = b, k = 2;
       while (used.has(n.toLowerCase()) || used.has(n)) n = `${b.slice(0, 26)}-${k++}`; used.add(n); used.add(n.toLowerCase()); t.sheet = n; });
-    const nav = [["🏠 Dashboard", "Dashboard"], ...types.map(t => [t.sheet, t.sheet]), ["🔌 Connections", "Connections"]];
+    const nav = [["🏠 Dashboard", "Dashboard"], ...types.map(t => [t.sheet, t.sheet]), ["🔌 Connections", "Connections"], ["📦 BOM", "BOM"]];
     const db = wb.addWorksheet("Dashboard", { views: [{ showGridLines: false }], properties: { tabColor: { argb: ARGB(NAVY) } } });
     const tws = types.map(t => wb.addWorksheet(t.sheet, { views: [{ showGridLines: false, state: "frozen", xSplit: 2, ySplit: 6, zoomScale: 85 }], properties: { tabColor: { argb: ARGB(t.color) } } }));
     const cn = wb.addWorksheet("Connections", { views: [{ showGridLines: false }] });
+    const bomWs = wb.addWorksheet("BOM", { views: [{ showGridLines: false }], properties: { tabColor: { argb: ARGB("0F766E") } } });
     const banner = (ws, title, sub, lastCol) => {
       ws.mergeCells(1, 1, 1, lastCol); put(ws, 1, 1, title, { font: { size: 16, bold: true, ...WHITEF }, fill: NAVY, al: LFT, border: false }); ws.getRow(1).height = 34;
       ws.mergeCells(2, 1, 2, lastCol); put(ws, 2, 1, sub, { font: { size: 9, italic: true, ...WHITEF }, fill: TEAL, al: LFT, border: false });
@@ -1242,6 +1243,58 @@
     types.forEach((t, j) => cn.getColumn(5 + j).width = 9);
     cn.getColumn(5 + nT).width = 14; cn.getColumn(6 + nT).width = 30;
 
+    // ---------- BOM ----------
+    const BOM_TRM_CAT = { ant: "Antenna", rad: "Radio (RAU)", idu: "Indoor (IDU/MMU)" };
+    banner(bomWs, TRM ? "📦 Bill of Materials – per link end" : "📦 Bill of Materials – per site", TRM ? "Qty per link end (×2 for both ends). Blue = edit in Dashboard." : "Qty per site. Total = qty × site count.", 9);
+    navbar(bomWs, 3);
+    hdr(bomWs, 5, 1, ["#", "Type", "Category", "Role / Band", "Model", TRM ? "Qty per end" : "Qty per site", TRM ? "Links" : "Sites", "Total qty", "Min/unit", "Total hours"]);
+    let bomRow = 6;
+    types.forEach(t => {
+      const typeSites = sites.filter(s => s.type === t.name).length;
+      const typeColor = ARGB(t.color);
+      const eqRows = [];
+      if (TRM) {
+        (t.units || []).filter(u => u.model || u.role).forEach(u => {
+          const cat = BOM_TRM_CAT[trmCat(u)] || "Equipment";
+          const qty = +u.qty || 0, minU = +u.min || 0;
+          const totalQty = qty * typeSites * 2;
+          eqRows.push([cat, u.role || "—", u.model || "—", qty, typeSites, totalQty, minU, Math.round(totalQty * minU / 60 * 10) / 10]);
+        });
+      } else {
+        (t.units || []).filter(u => u.model || u.role).forEach(u => {
+          const cat = isAir(u) ? "AIR" : "Radio";
+          const qty = +u.qty || 0, minU = +u.min || 0;
+          const totalQty = qty * typeSites;
+          eqRows.push([cat, u.role || "Radio", u.model || "—", qty, typeSites, totalQty, minU, Math.round(totalQty * minU / 60 * 10) / 10]);
+        });
+        (t.basebands || []).filter(b => b.model && +b.qty > 0).forEach(b => {
+          const qty = +b.qty, minU = 90, totalQty = qty * typeSites;
+          eqRows.push([`Baseband (${b.status || "New"})`, b.tech || "—", b.model, qty, typeSites, totalQty, minU, Math.round(totalQty * minU / 60 * 10) / 10]);
+        });
+        (t.rbs || []).filter(r => r.type && +r.qty > 0).forEach(r => {
+          const qty = +r.qty, minU = +r.min || 90, totalQty = qty * typeSites;
+          eqRows.push(["Cabinet / RBS", "—", r.type, qty, typeSites, totalQty, minU, Math.round(totalQty * minU / 60 * 10) / 10]);
+        });
+      }
+      eqRows.forEach((eq, j) => {
+        const r = bomRow + j;
+        put(bomWs, r, 1, bomRow - 5 + j, { al: CEN });
+        put(bomWs, r, 2, t.name, { font: { bold: true, color: { argb: "FFFFFFFF" } }, fill: t.color, al: CEN });
+        put(bomWs, r, 3, eq[0], { font: { bold: true } });
+        put(bomWs, r, 4, eq[1]);
+        put(bomWs, r, 5, eq[2]);
+        put(bomWs, r, 6, eq[3], { font: { color: { argb: "FF0000FF" } }, fill: IN, al: CEN });
+        put(bomWs, r, 7, eq[4], { al: CEN });
+        put(bomWs, r, 8, eq[5], { font: { bold: true }, al: CEN });
+        put(bomWs, r, 9, eq[6], { al: CEN });
+        put(bomWs, r, 10, eq[7], { al: CEN, fmt: "0.0" });
+      });
+      if (eqRows.length) bomRow += eqRows.length;
+    });
+    // Total man-hours
+    if (bomRow > 6) { put(bomWs, bomRow, 1, "TOTAL", { font: { bold: true, ...WHITEF }, fill: NAVY, al: CEN }); bomWs.mergeCells(bomRow, 1, bomRow, 9); put(bomWs, bomRow, 10, { formula: `SUM(J6:J${bomRow - 1})`, result: 0 }, { font: { bold: true, ...WHITEF }, fill: NAVY, al: CEN, fmt: "0.0" }); }
+    [4, 16, 18, 16, 20, 10, 8, 10, 10, 11].forEach((w, i) => bomWs.getColumn(i + 1).width = w);
+
     // ---------- Dashboard ----------
     const xl = d => d.getTime() / 86400000 + 25569;
     const lastDbCol = 6 + ND + 5;
@@ -1363,6 +1416,17 @@
     // ---- page 1: overview
     head(`Installation MOP – ${title}`, TRM ? `TRM (MW link)  |  Generated ${new Date().toISOString().slice(0, 10)}  |  ${sites.length} links  |  ${types.length} link types` : `Generated ${new Date().toISOString().slice(0, 10)}  |  ${sites.length} sites  |  ${types.length} site types  |  ${ND} days per site`);
     let y = 30;
+    // QR code (top-right of page 1) – project summary for quick field lookup
+    const QRF = (typeof window !== "undefined" && window.qrcode) || (typeof qrcode !== "undefined" ? qrcode : null);
+    if (QRF) {
+      try {
+        const qr = QRF(0, "M");
+        qr.addData(clean(`MOP: ${P.name || ""}${P.country ? " | " + P.country : ""}${P.customer ? " | " + P.customer : ""}\n${sites.length} ${Us} | ${types.length} types | ${P.teams} teams\nStart ${P.startDate} - finish ${finish.toISOString().slice(0, 10)}\nGenerated ${new Date().toISOString().slice(0, 10)}`));
+        qr.make();
+        doc.addImage(qr.createDataURL(4, 0), "GIF", W - M0 - 30, 26, 30, 30);
+        doc.setFontSize(7); doc.setTextColor(120, 130, 140); doc.text("Scan for project summary", W - M0 - 15, 59, { align: "center" }); doc.setTextColor(23, 34, 48);
+      } catch (e) {}
+    }
     doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text("Key facts", M0, y); y += 2;
     const allowed = `${clock(hm(P.outStart))} -> ${clock(hm(P.outStart) + (+P.outMax || 0) * 60)} (${P.outMax} h)`;
     doc.autoTable({ startY: y, margin: { left: M0 }, tableWidth: 190, theme: "plain", styles: { fontSize: 9.5, cellPadding: 1.4 },
@@ -1432,6 +1496,37 @@
           notes.forEach(n => { yy += 4.3; if (yy < Hh - 12) doc.text("•  " + n, M0, yy, { maxWidth: W - 2 * M0 }); }); }
       });
     });
+    // ---- rollback plan
+    const rbItems = [];
+    types.forEach(t => t.sch.days.forEach((d, di) => d.acts.forEach((a, k) => {
+      if (!a.dur) return;
+      const isRb = a.rem && /rollback|revert|fall ?back|old link|keep.*old/i.test(a.rem);
+      if (isRb || (a.impact === "Outage" && a.rem)) rbItems.push([t.name, `Day ${di + 1}`, `${di + 1}.${k + 1}`, clean(a.name), `${clock(a.start)}-${clock(a.end)}`, clean(a.rem)]);
+    })));
+    const rbTypes = types.filter(t => !t.sch.noOutage);
+    if (rbItems.length || rbTypes.length) {
+      doc.addPage();
+      head(`Rollback plan – ${title}`, "When to stop, and how to return to the previous working state");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text("Go / no-go per type", M0, 30);
+      doc.autoTable({ startY: 32, margin: { left: M0, right: M0 }, styles: { fontSize: 9, cellPadding: 1.6, valign: "middle" },
+        headStyles: { fillColor: rgb("C92A2A"), textColor: 255 },
+        head: [["Type", "Outage window", "Latest rollback start", "Rollback rule"]],
+        body: rbTypes.map(t => { const S = t.sch, lastRb = S.allowedEnd - 30;
+          return [t.name, `${clock(S.outStart)} -> ${clock(S.outEnd)} (${fmt(S.outage)} h)`, clock(lastRb),
+            TRM ? "If the new link is not up and NOC-confirmed by the latest rollback time, reconnect the old link / IDU and confirm all sites up." : "If cells are not on air and KPIs not confirmed by the latest rollback time, restore old jumpers / RRUs / baseband config and confirm with NOC."]; }),
+        columnStyles: { 0: { cellWidth: 34, fontStyle: "bold" }, 1: { cellWidth: 42 }, 2: { cellWidth: 34, halign: "center", fontStyle: "bold", textColor: rgb("C92A2A") } },
+        didParseCell: h => { if (h.section === "body" && h.column.index === 0) { h.cell.styles.fillColor = rgb(rbTypes[h.row.index].color); h.cell.styles.textColor = 255; } } });
+      if (rbItems.length) {
+        let yr = doc.lastAutoTable.finalY + 8;
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(23, 34, 48); doc.text("Decision points & rollback notes", M0, yr);
+        doc.autoTable({ startY: yr + 2, margin: { left: M0, right: M0, bottom: 14, top: 26 }, showHead: "everyPage",
+          didDrawPage: h => { if (h.pageNumber > 1) head(`Rollback plan – ${title} (cont.)`, "Decision points & rollback notes"); },
+          styles: { fontSize: 8.5, cellPadding: 1.3, valign: "middle", overflow: "linebreak" },
+          headStyles: { fillColor: rgb("2E3B55"), textColor: 255 },
+          head: [["Type", "Day", "#", "Step", "Time", "Note / rollback action"]], body: rbItems,
+          columnStyles: { 0: { cellWidth: 30, fontStyle: "bold" }, 1: { cellWidth: 14, halign: "center" }, 2: { cellWidth: 11, halign: "center" }, 3: { cellWidth: 62 }, 4: { cellWidth: 22, halign: "center" } } });
+      }
+    }
     const n = doc.getNumberOfPages();
     for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(140, 150, 160);
       doc.text(clean(title) + "  |  Installation MOP (summary) – full detail in Excel", M0, Hh - 6); doc.text(`${i} / ${n}`, W - M0, Hh - 6, { align: "right" }); }

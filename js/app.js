@@ -25,6 +25,12 @@ function switchMode(m){ save(); ALL.mode=m; S=ALL[m]; sel=0; applyMode(); render
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const COL=i=>"#"+M.COLORS[i%M.COLORS.length];
 const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),3200)};
+// ── Field completion tracking ──
+const CK_KEY="mop-completions";
+let completions={};
+try{completions=JSON.parse(localStorage.getItem(CK_KEY)||"{}")}catch(e){completions={}}
+function saveCompletions(){try{localStorage.setItem(CK_KEY,JSON.stringify(completions))}catch(e){}}
+function updateProgress(){const all=document.querySelectorAll(".lane:not(.skip) .step-ck");if(!all.length)return;const done=Array.from(all).filter(c=>c.checked).length;const el=document.getElementById("ck-progress");if(el){el.textContent=`${done}/${all.length} done`;el.classList.toggle("ck-all",done===all.length);}}
 
 function opts(kind,v){return S.equipment.filter(e=>e.kind===kind).map(e=>`<option ${e.model===v?"selected":""}>${esc(e.model)}</option>`).join("")}
 function updCut(){
@@ -42,6 +48,7 @@ function renderInputs(){
    <div class="tcard" style="--c:${COL(i)}" data-i="${i}">
     <div class="head"><label class="f">Name<input type="text" data-t="name" value="${esc(t.name)}"></label>
       <label class="f">${TRMm()?'No. of Sites (MW links)':'Sites'}<input type="number" min="0" data-t="sites" value="${t.sites}"></label>
+      <button class="dup" data-dup="${i}" aria-label="Duplicate ${esc(t.name)}" title="Duplicate type">⧉</button>
       <button class="x" data-del="${i}" aria-label="Remove ${esc(t.name)}" title="Remove">×</button></div>
     ${!TRMm()?`<div class="twr"><label class="f">Tower type<input type="text" list="towerTypes" data-t="towerType" value="${esc(t.towerType||'Monopole')}" placeholder="GF / Rooftop / Monopole / Lattice"></label>
       <label class="f">Height&nbsp;(m)<input type="number" min="5" max="300" step="5" data-t="towerHeight" data-num="1" value="${+t.towerHeight||30}"></label></div>
@@ -112,7 +119,7 @@ function render(){
     return `<button class="tile" style="--c:${COL(i)}" data-sel="${i}" aria-pressed="${i===sel}">
       <div class="nm"><i></i>${esc(t.name)} <span style="font-weight:500;color:var(--ink-2);font-size:13px">· ${cnt(t.name)} ${W1()}${cnt(t.name)===1?"":"s"}</span></div>
       <div class="eqt">${TRMm()?`<b>${esc((M.TRM_METHODS[t.method]||M.TRM_METHODS.normal).label)}${t.sd?" + SD":""}</b> · `:`<b>${esc((M.RAN_SCEN[t.scenario]||M.RAN_SCEN.swap).label)}</b> · `}${esc(M.equipTxt(t))}</div>
-      <dl class="${r.days.length>=3?"many":""}" style="grid-template-columns:repeat(${r.days.length+1},1fr)">${r.days.map((d,k)=>`<div><dt>Day ${k+1}${d.cut?(TRMm()?" 🔴":" ⚡"):""}</dt><dd>${M.fmt(d.hours)}</dd></div>`).join("")}<div><dt>Outage</dt><dd class="o">${r.noOutage?"none":M.fmt(r.outage)}</dd></div></dl>
+      <dl class="${r.days.length>=3?"many":""}" style="grid-template-columns:repeat(${r.days.length+1},1fr)">${r.days.map((d,k)=>`<div><dt>Day ${k+1}${d.cut?(TRMm()?" 🔴":" ⚡"):""}</dt><dd>${M.fmt(d.hours)}</dd></div>`).join("")}<div><dt>Outage</dt><dd class="o">${r.noOutage?"none":M.fmt(r.outage)+(r.noOutage?"":"<small>"+M.clock(r.outStart)+"→"+M.clock(r.outEnd)+"</small>")}</dd></div></dl>
       <span class="flag ${bad||!r.outOk?"bad":""}">${bad?"⚠ Over "+S.project.maxHours+" h – split or add crew":!r.outOk?"⚠ Outage exceeds the allowed "+S.project.outMax+" h":"✔ Fits the day and the outage window"}</span>
     </button>`}).join("");
   // totals
@@ -142,7 +149,7 @@ function render(){
     };
     return `<div class="day"><div class="dayhead"><b>${esc(d.title.replace(/^\S+\s/,""))}</b><span class="${bad?"bad":""}">${M.clock(d.arrive)} → ${M.clock(d.leave)} · ${M.fmt(d.hours)} h</span></div>
       <div class="scale"><span></span><div class="ticks">${ticks(d.arrive)}</div><span></span></div>
-      ${d.acts.map((a,k)=>`<div class="lane ${a.dur?"":"skip"}"><div class="lb" title="${esc(a.name)} – ${esc(a.who)}${a.desc?"\n"+esc(a.desc):""}"><em>${di+1}.${k+1}</em>${esc(a.name)}${tag(a)}</div>
+      ${d.acts.map((a,k)=>`<div class="lane ${a.dur?"":"skip"} ${completions[t.name+"|"+a.id]?"done":""}"><div class="lb" title="${esc(a.name)} – ${esc(a.who)}${a.desc?"\n"+esc(a.desc):""}"><label class="ck-lbl"><input type="checkbox" class="step-ck" data-ck="${esc(t.name+"|"+a.id)}"${completions[t.name+"|"+a.id]?" checked":""}></label><em>${di+1}.${k+1}</em>${esc(a.name)}${tag(a)}</div>
         <div class="track" style="--hr:${60/W*100}%">${ob}${over}${a.dur?`<div class="bar-a" style="--k:${colorOf(a)};left:${(a.start-d.arrive)/W*100}%;width:${a.dur/W*100}%" title="${M.clock(a.start)}–${M.clock(a.end)} · ${a.dur} min">${a.dur>=30?a.dur+"′":""}</div>`:""}</div>
         <div class="ed">${timingSel(a)}${daySel(a)}<input type="number" min="0" class="du" data-du="${esc(a.id)}" value="${a.dur}" aria-label="Minutes" title="Minutes"><button class="x" data-rm="${esc(a.id)}" aria-label="Remove ${esc(a.name)}" title="Remove step">×</button></div></div>`).join("")}
       <div class="addrow" data-day="${di+1}">
@@ -160,6 +167,7 @@ function render(){
   $("#tl").innerHTML=`<div class="tlhead"><h2>${esc(t.name)} — ${r.days.length} day${r.days.length>1?"s":""} ${TRMm()?"per link":"on site"}</h2>
       <div class="tlbtn">${nd>1?`<span class="balwrap"><button class="ghost2" id="bal" title="Move flexible blocks to even out the days">⚖ Balance</button>${balHtml}</span>`:""}
       <button class="ghost2" id="rst" title="Undo all step edits for this type">↺ Reset steps</button></div></div>
+    <div class="tl-tools"><input type="search" id="stepSearch" class="step-srch" placeholder="🔍 Filter steps…" autocomplete="off"><span id="ck-progress" class="ck-prg"></span><button class="ghost2" id="clkBtn" title="Print field checklist for ${esc(t.name)}">🖨 Checklist</button></div>
     <div class="sub">${r.noOutage?`<b style="color:var(--green)">No outage for this MOP type</b>`:`Outage on Day ${r.cutIdx}: ${M.clock(r.outStart)} → ${M.clock(r.outEnd)} (${M.fmt(r.outage)}) · allowed ${M.clock(r.outApproved)} → ${M.clock(r.allowedEnd)} <b style="color:${r.outOk?"var(--green)":"var(--red)"}">${r.outOk?"✔ within window":"⚠ exceeds window"}</b>`} · Total ${M.fmt(r.total)} on site${t.reuseCabling?" · cable runs skipped (reused)":""}</div>
     <div class="legend"><span style="--k:var(--amber)">${TRMm()?"Riggers":"Tower crew"}</span><span style="--k:var(--blue)">${TRMm()?"Team lead / FE":"Ground / FE"}</span><span style="--k:var(--violet)">Remote integrator</span><span style="--k:var(--red)">Outage</span><span style="--k:rgba(47,158,68,.35)">Allowed outage window</span></div>
     <p class="hint">Edit any step: move it to another day (D1…), change its minutes, remove it (×) or add your own step at the end of a day. Moved / added steps run after the same crew's last step of that day.</p>
@@ -167,11 +175,13 @@ function render(){
     ${rem.length?`<div class="removed"><b>Removed steps:</b> ${rem.map(x=>`<button class="chip" data-restore="${esc(x.id)}" title="Restore">↩ D${x.day} ${esc(x.name)}</button>`).join(" ")}</div>`:""}
     <div class="note">The Excel file has the full MOP for every ${TRMm()?"link":"site"} type: steps, who, dependencies, clock times, time mapping, connections and a Connections sheet. D0 (day-before) preparation is listed on its Dashboard.</div>`;
   $("#stepLib").innerHTML=(TRMm()?M.TRM_FIXED:M.FIXED.concat(M.RAN_EXTRA_LIST)).map(f=>`<option value="${esc(f[1])}">`).join("");
+  setTimeout(updateProgress,0);
 }
 
 // events
 document.addEventListener("input",e=>{
   const el=e.target, v=(el.type==="number"||el.dataset.num)?(el.value===""?0:+el.value):el.type==="checkbox"?el.checked:el.value;
+  if(el.id==="stepSearch"){const q=el.value.trim().toLowerCase();document.querySelectorAll(".lane").forEach(ln=>{const nm=(ln.querySelector(".lb")?.textContent||"").toLowerCase();ln.style.display=!q||nm.includes(q)?"":"none";});return}
   if(el.dataset.p){ S.project[el.dataset.p]=v; document.querySelectorAll(`[data-p="${el.dataset.p}"]`).forEach(o=>{if(o!==el)o.value=v});
     updCut(); }
   else if(el.id==="pname") S.project.name=v;
@@ -211,6 +221,7 @@ function curT(){return S.types[sel]}
 function edits(t){t.edits=t.edits||{};["rm","mv","dur","afterOf"].forEach(k=>t.edits[k]=t.edits[k]||{});t.edits.add=t.edits.add||[];return t.edits}
 document.addEventListener("change",e=>{
   const el=e.target, t=curT(); if(!t) return;
+  if(el.classList.contains("step-ck")){const k=el.dataset.ck;if(el.checked)completions[k]=1;else delete completions[k];saveCompletions();el.closest(".lane").classList.toggle("done",el.checked);updateProgress();return}
   if(el.classList.contains("bg")&&t){if(!t.balGroups)t.balGroups={};t.balGroups[el.dataset.gk]=el.checked;return}
   if(el.dataset.atm){const id=el.dataset.atm, E=edits(t);
     if(el.value==="") delete E.afterOf[id]; else E.afterOf[id]=el.value;
@@ -232,6 +243,9 @@ document.addEventListener("click",e=>{
   if(b.dataset.addday&&t0){const row=b.closest(".addrow"), nm=row.querySelector(".an").value.trim(); if(!nm){toast("Type a step name first.");return}
     const E=edits(t0); E.add.push({id:Date.now().toString(36),name:nm,who:row.querySelector(".aw2").value,dur:+row.querySelector(".am").value||0,day:+b.dataset.addday,after:row.querySelector(".aa").value,outage:!!(row.querySelector(".aoc")&&row.querySelector(".aoc").checked)});
     render(); toast(`Step added to Day ${b.dataset.addday}.`); return}
+  if(b.dataset.dup!==undefined){const src=S.types[+b.dataset.dup];const cp=JSON.parse(JSON.stringify(src));const base=src.name.replace(/ \(copy(?: \d+)?\)$/,"");let nm=base+" (copy)",n=2;while(S.types.some(x=>x.name===nm))nm=`${base} (copy ${n++})`;cp.name=nm;cp.edits={rm:{},mv:{},dur:{},add:[]};S.types.splice(+b.dataset.dup+1,0,cp);sel=+b.dataset.dup+1;renderInputs();render();toast("Type duplicated.");return}
+  if(b.id==="clkBtn"){buildChecklist();return}
+  if(b.id==="dmToggle"){const nowDark=isDark();const next=nowDark?"light":"dark";document.documentElement.dataset.theme=next;try{localStorage.setItem("mop-theme",next)}catch(e){}syncDm();return}
   if(b.id==="bal"&&t0){const before=M.schedule(S,t0).days.map(d=>M.fmt(d.hours)).join(" / ");
     const sel=new Set(document.querySelectorAll(".bg:checked").map?Array.from(document.querySelectorAll(".bg:checked")).map(c=>c.dataset.gk):[...document.querySelectorAll(".bg:checked")].map(c=>c.dataset.gk));
     t0.edits=M.autoBalanceGroups?M.autoBalanceGroups(S,t0,sel.size?sel:undefined):M.autoBalance(S,t0);
@@ -307,4 +321,33 @@ $("#imp").onchange=async e=>{
   e.target.value="";
 };
 if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(()=>{});
+
+// ── Dark mode init ──
+function isDark(){const t=document.documentElement.dataset.theme;return t==="dark"||(t!=="light"&&window.matchMedia("(prefers-color-scheme:dark)").matches)}
+function syncDm(){const btn=document.getElementById("dmToggle");if(!btn)return;const d=isDark();btn.textContent=d?"☀":"🌙";btn.title=d?"Light mode":"Dark mode";}
+(()=>{let t=null;try{t=localStorage.getItem("mop-theme")}catch(e){}if(t)document.documentElement.dataset.theme=t;syncDm();})();
+
+// ── Field Checklist ──
+function buildChecklist(){
+  const t=S.types[sel]; if(!t){toast("No type selected.");return}
+  const r=M.schedule(S,t);
+  const P=S.project;
+  let html=`<div class="ckl-actions"><button class="ckl-print-btn" onclick="window.print()">🖨 Print / Save PDF</button><button class="ckl-close" onclick="document.getElementById('ckl-overlay').remove()">✕ Close</button></div>`;
+  html+=`<h1>${esc(P.name||"MOP")} – ${esc(t.name)}</h1>`;
+  html+=`<div class="ckl-meta">${esc(P.country||"")} · ${r.days.length} day${r.days.length>1?"s":""} · Outage ${r.noOutage?"none":M.clock(r.outStart)+"→"+M.clock(r.outEnd)} · Generated ${new Date().toLocaleDateString()}</div>`;
+  r.days.forEach((d,di)=>{
+    const acts=d.acts.filter(a=>a.dur>0);
+    html+=`<div class="ckl-day"><h2>${esc(d.title)} &nbsp;·&nbsp; on site ${M.clock(d.arrive)}–${M.clock(d.leave)} (${M.fmt(d.hours)} h)</h2>`;
+    acts.forEach((a,k)=>{
+      const id=`cl-${di}-${k}`;
+      html+=`<div class="ckl-step"><input type="checkbox" id="${id}"><label for="${id}"><b>${di+1}.${k+1} – ${esc(a.name)}</b><span>${esc(a.who)}</span><span>${M.clock(a.start)} – ${M.clock(a.end)} (${a.dur} min)</span>${a.rem?`<small>${esc(a.rem)}</small>`:""}</label></div>`;
+    });
+    html+="</div>";
+  });
+  const ov=document.createElement("div");
+  ov.id="ckl-overlay";ov.className="ckl-overlay";ov.innerHTML=html;
+  document.getElementById("ckl-overlay")?.remove();
+  document.body.appendChild(ov);
+  window.addEventListener("afterprint",()=>ov.remove(),{once:true});
+}
 })();
