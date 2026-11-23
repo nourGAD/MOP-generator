@@ -8,1070 +8,664 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="vendor/exceljs.min.js"></script>
-<script src="vendor/jspdf.umd.min.js"></script>
-<script src="vendor/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root{
   --ink:#172230;--ink-2:#4A5868;--line:#D5DCE4;--paper:#E9EDF1;--panel:#FFFFFF;--field:#F6F8FA;
   --amber:#F2A20C;--amber-dk:#3B2600;--blue:#3F6FD8;--violet:#8B5CF6;--green:#2F9E44;--teal:#0F766E;--red:#D94141;
-  --shade:#E6EAEF;--focus:#1A73E8;
+  --shade:#E6EAEF;--focus:#1A73E8;--bar:#172230;
   --sans:"IBM Plex Sans",system-ui,sans-serif;
   --cond:"IBM Plex Sans Condensed","Arial Narrow",sans-serif;
 }
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --ink:#E7ECF2;--ink-2:#9AA7B6;--line:#2D3946;--paper:#0F151C;--panel:#17202A;--field:#1D2833;--shade:#222D39;
+  --ink:#E7ECF2;--ink-2:#9AA7B6;--line:#2D3946;--paper:#0F151C;--panel:#17202A;--field:#1D2833;--shade:#222D39;--bar:#0B1118;
 }}
+:root[data-theme="dark"]{--ink:#E7ECF2;--ink-2:#9AA7B6;--line:#2D3946;--paper:#0F151C;--panel:#17202A;--field:#1D2833;--shade:#222D39;--bar:#0B1118}
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.5 var(--sans)}
 button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 a{color:inherit;text-decoration:none}
+[hidden]{display:none!important}
 
-/* ── BAR ── */
-.bar{position:sticky;top:0;z-index:10;display:flex;gap:10px;align-items:center;padding:10px 20px;background:var(--ink);color:#fff;flex-wrap:wrap}
+/* bar */
+.bar{position:sticky;top:0;z-index:10;display:flex;gap:10px;align-items:center;padding:10px 20px;background:var(--bar);color:#fff;flex-wrap:wrap}
 .bar-back{background:transparent;border:1px solid #5E7185;color:#fff;border-radius:6px;padding:8px 12px;cursor:pointer;font:600 13px var(--sans)}
 .bar-back:hover{border-color:#AFC0D2}
 .bar-title{font:700 18px/1 var(--cond)}
 .bar-sub{font:500 12px/1 var(--cond);color:#AFC0D2;margin-top:2px}
 .bar-mast{display:flex;flex-direction:column;flex-shrink:0}
 .bar-spacer{flex:1}
-.gen{background:var(--amber);color:var(--amber-dk);border:0;border-radius:6px;padding:10px 18px;font:700 14px/1 var(--cond);cursor:pointer;white-space:nowrap}
+.gen{background:var(--amber);color:var(--amber-dk);border:0;border-radius:6px;padding:10px 16px;font:700 14px/1 var(--cond);cursor:pointer;white-space:nowrap}
 .gen:hover{filter:brightness(1.07)}.gen:disabled{opacity:.6;cursor:progress}
 .gen.ghost{background:transparent;color:var(--amber);border:1px solid var(--amber)}
 .gen.ghost:hover{background:rgba(242,162,12,.1)}
+.gen.plain{background:transparent;color:#C9D3DE;border:1px solid #5E7185}
 .vtabs{display:flex;gap:3px;background:rgba(255,255,255,.08);border:1px solid #5E7185;border-radius:7px;padding:3px}
 .vtab{background:transparent;border:0;color:#C9D3DE;font:700 13px/1 var(--cond);padding:8px 14px;border-radius:5px;cursor:pointer}
 .vtab.active{background:var(--amber);color:var(--amber-dk)}
+.dtab.active{background:#fff;color:var(--ink)}
 
-/* ── SETUP ── */
-.setup{max-width:780px;margin:0 auto;padding:32px 20px}
-.setup h2{font:700 24px/1.1 var(--cond);margin:0 0 6px}
-.setup .sub{color:var(--ink-2);font-size:13px;margin:0 0 24px}
-.proj-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
-.proj-row label{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink-2)}
-.proj-row input{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:9px 10px;width:100%}
-
+/* setup */
+.setup{max-width:860px;margin:0 auto;padding:28px 20px 60px}
+.setup h2{font:700 26px/1.1 var(--cond);margin:0 0 6px}
+.setup .sub{color:var(--ink-2);font-size:13.5px;margin:0 0 20px}
 .eq-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:16px}
-.eq-box-head{padding:14px 18px 10px;border-bottom:1px solid var(--shade);display:flex;align-items:flex-start;gap:10px}
-.eq-box-head-text{flex:1}
+.eq-box-head{padding:14px 18px 10px;border-bottom:1px solid var(--shade);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.eq-box-head-text{flex:1;min-width:200px}
 .eq-box-head b{font:700 15px var(--cond)}
-.eq-box-head p{font-size:12px;color:var(--ink-2);margin:4px 0 0}
-/* Mic button */
-.mic-btn{flex-shrink:0;display:flex;align-items:center;gap:6px;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font:700 12px var(--cond);color:var(--ink-2);transition:background .15s,border-color .15s}
+.eq-box-head p{font-size:12px;color:var(--ink-2);margin:2px 0 0}
+.voice{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.voice select{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px}
+.mic-btn{position:relative;display:flex;align-items:center;gap:7px;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font:700 12.5px var(--cond);color:var(--ink-2);min-width:112px;justify-content:center;overflow:hidden}
 .mic-btn:hover{border-color:var(--blue);color:var(--blue)}
-.mic-btn.listening{background:rgba(217,65,65,.1);border-color:var(--red);color:var(--red);animation:pulse-mic 1.2s ease-in-out infinite}
-.mic-btn.listening .mic-ring{animation:ring-spin 1.2s linear infinite}
+.mic-btn.listening{background:rgba(217,65,65,.1);border-color:var(--red);color:var(--red)}
+.mic-btn .prog{position:absolute;left:0;bottom:0;height:3px;background:var(--red);width:0}
 .mic-icon{width:16px;height:16px;flex-shrink:0}
-.mic-ring{width:8px;height:8px;border-radius:50%;background:var(--red);display:none}
-.mic-btn.listening .mic-ring{display:block}
-.mic-interim{font-size:12px;color:var(--ink-2);font-style:italic;padding:4px 18px 0;min-height:18px}
-@keyframes pulse-mic{0%,100%{opacity:1}50%{opacity:.6}}
-.eq-textarea{width:100%;min-height:130px;border:0;padding:14px 18px;background:transparent;resize:vertical;font:500 14px/1.7 var(--sans);color:var(--ink)}
+.mic-dot{width:8px;height:8px;border-radius:50%;background:var(--red);display:none;animation:blink 1s infinite}
+.mic-btn.listening .mic-dot{display:block}
+@keyframes blink{50%{opacity:.25}}
+.autob{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-2);cursor:pointer}
+.mic-interim{font-size:12.5px;color:var(--ink-2);font-style:italic;padding:6px 18px 0;min-height:22px}
+.eq-textarea{width:100%;min-height:150px;border:0;padding:12px 18px;background:transparent;resize:vertical;font:500 14.5px/1.7 var(--sans);color:var(--ink)}
 .eq-textarea:focus{outline:none;background:rgba(26,115,232,.03)}
 .eq-textarea::placeholder{color:var(--ink-2);font-style:italic}
+.examples{display:flex;gap:6px;flex-wrap:wrap;padding:0 18px 12px}
+.ex{background:var(--field);border:1px dashed var(--line);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--ink-2);cursor:pointer}
+.ex:hover{border-color:var(--blue);color:var(--blue)}
 
-/* Parse preview */
-.parse-preview{padding:10px 18px 14px;border-top:1px solid var(--shade);min-height:36px}
-.parse-preview .plabel{font:600 11px var(--cond);text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);margin-bottom:8px}
-.chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:4px 10px 4px 8px;font-size:12.5px;font-weight:600}
-.chip.ok{background:#D3F9D8;color:#2B8A3E}
-.chip.warn{background:#FFF3CD;color:#856404}
-.chip.reused{background:#E7F0FF;color:#2C5CB5}
+.und{padding:12px 18px 14px;border-top:1px solid var(--shade)}
+.plabel{font:600 11px var(--cond);text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);margin:0 0 7px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:3px 10px 3px 8px;font-size:12.5px;font-weight:600;background:var(--field);border:1px solid var(--line)}
+.chip.ran{background:#E7F0FF;color:#2C5CB5;border-color:#C9DAFB}
+.chip.trm{background:#DEF5F1;color:#0F766E;border-color:#BFE7E0}
+.chip.reused{background:var(--field);color:var(--ink-2);text-decoration:line-through;text-decoration-color:rgba(0,0,0,.25)}
+.chip.bbr{background:var(--field);color:var(--ink-2)}
+.chip.set{background:#FFF4DC;color:#7A5200;border-color:#F6DFA8}
+.chip.warn{background:#FFF3CD;color:#856404;border-color:#F3DE9B}
 .chip-qty{font:700 13px var(--cond)}
-.chip-eq{font:600 12px var(--sans)}
-.chip-status{font-size:11px;font-weight:400;opacity:.8}
+.chip-s{font-size:11px;font-weight:400;opacity:.8}
+.empty-und{font-size:12.5px;color:var(--ink-2)}
 
-.opts-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:24px}
-.opts-row label{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink-2)}
-.opts-row select,.opts-row input[type=time]{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:9px 10px;width:100%}
-
+details.adj{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:16px}
+details.adj summary{padding:12px 18px;cursor:pointer;font:700 14px var(--cond)}
+details.adj summary small{font:500 12px var(--sans);color:var(--ink-2);margin-left:6px}
+.adj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;padding:4px 18px 18px}
+.adj-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-2)}
+.adj-grid input,.adj-grid select{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:8px 9px;width:100%}
+.adj-grid input.touched,.adj-grid select.touched{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}
 .btn-gen-big{width:100%;padding:14px;font:700 16px var(--cond);border-radius:8px;background:var(--amber);color:var(--amber-dk);border:0;cursor:pointer}
 .btn-gen-big:hover{filter:brightness(1.07)}
+.kbd{font-size:11.5px;color:var(--ink-2);text-align:center;margin-top:8px}
 
-/* ── MOP WRAP ── */
-.mop-wrap{padding:20px clamp(12px,3vw,28px) 60px}
-
-/* ── DASHBOARD ── */
-.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
-.stat .n{font:700 38px/1 var(--cond);margin-bottom:4px}
+/* MOP views */
+.mop-wrap{padding:20px clamp(12px,3vw,28px) 60px;max-width:1400px;margin:0 auto}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.stat .n{font:700 32px/1 var(--cond);margin-bottom:5px}
 .stat .l{font-size:12.5px;color:var(--ink-2)}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:14px}
-.card h3{font:700 15px var(--cond);margin:0 0 14px}
-.day-row{padding:10px 0;border-bottom:1px solid var(--shade)}
+.stat .n small{font:600 13px var(--cond);color:var(--ink-2);margin-left:3px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin-bottom:14px}
+.card h3{font:700 15px var(--cond);margin:0 0 12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ulist{margin:0;padding-left:18px;font-size:13px}
+.ulist li{margin:2px 0}
+.okpill{display:inline-block;font:700 11.5px var(--cond);padding:3px 9px;border-radius:10px;color:#fff;background:var(--green)}
+.okpill.bad{background:var(--red)}
+.note{font-size:12.5px;color:var(--ink-2);margin:8px 0 0}
+.day-row{padding:9px 0;border-bottom:1px solid var(--shade)}
 .day-row:last-child{border:0}
-.day-row .dhead{display:flex;justify-content:space-between;margin-bottom:6px}
-.day-row .dhead b{font:700 14px var(--cond)}
-.day-row .dhead span{font-size:12.5px;color:var(--ink-2)}
-.bar-track{height:14px;background:var(--shade);border-radius:3px;overflow:hidden}
+.dhead{display:flex;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.dhead b{font:700 14px var(--cond)}
+.dhead span{font-size:12.5px;color:var(--ink-2)}
+.bar-track{height:12px;background:var(--shade);border-radius:3px;overflow:hidden;position:relative}
 .bar-fill{height:100%;border-radius:3px}
-.crew-row{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13px}
+.bar-max{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink-2)}
+.crew-row{display:flex;align-items:center;gap:10px;padding:4px 0;font-size:13px}
 .crew-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.crew-name{width:170px;font-weight:600}
+.crew-name{width:200px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .crew-bar-wrap{flex:1;height:8px;background:var(--shade);border-radius:2px;overflow:hidden}
 .crew-bar-inner{height:100%;border-radius:2px}
 .crew-hrs{width:55px;text-align:right;color:var(--ink-2);font-size:12px}
 
-/* ── GANTT ── */
-.gantt-day{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
-.gantt-dhead{display:flex;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:10px}
+.gantt-day{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.gantt-dhead{display:flex;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:8px;gap:10px;flex-wrap:wrap}
 .gantt-dhead b{font:700 15px var(--cond)}
 .gantt-dhead span{font:600 12px var(--cond);color:var(--ink-2)}
-.gantt-scale{position:relative;height:18px;margin-left:200px;font-size:10px;color:var(--ink-2);margin-bottom:2px}
+.gantt-scale{position:relative;height:18px;margin-left:250px;font-size:10px;color:var(--ink-2)}
 .gantt-scale span{position:absolute;transform:translateX(-50%)}
-.gantt-crew{margin-bottom:8px}
-.gantt-crew-lbl{font:700 11px var(--cond);color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;display:flex;align-items:center;gap:5px}
-.gantt-step{display:grid;grid-template-columns:200px 1fr;gap:6px;align-items:center;min-height:24px;border-top:1px solid var(--shade)}
-.gantt-name{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:3px 0}
-.gantt-track{position:relative;height:18px;background:repeating-linear-gradient(to right,var(--shade) 0,var(--shade) 1px,transparent 1px,transparent var(--tick))}
-.gantt-bar{position:absolute;top:2px;height:14px;border-radius:3px;font:700 9.5px/14px var(--cond);color:#fff;padding:0 4px;white-space:nowrap;overflow:hidden;min-width:2px}
+.gantt-step{display:grid;grid-template-columns:250px 1fr;gap:6px;align-items:center;min-height:24px;border-top:1px solid var(--shade)}
+.gantt-name{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:3px 0}
+.gantt-name em{font-style:normal;color:var(--ink-2);font-weight:600;margin-right:4px}
+.gantt-track{position:relative;height:18px}
+.gantt-win{position:absolute;top:0;bottom:0;background:rgba(217,65,65,.08);border-left:1px dashed var(--red);border-right:1px dashed var(--red)}
+.gantt-bar{position:absolute;top:2px;height:14px;border-radius:3px;font:700 9.5px/14px var(--cond);color:#fff;padding:0 4px;white-space:nowrap;overflow:hidden;min-width:3px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin:0 0 12px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 
-/* ── TABLE ── */
+.tools{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.tools input{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:240px}
+.prog-txt{font:700 13px var(--cond);color:var(--ink-2)}
+.prog-txt.all{color:var(--green)}
 .tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--line)}
 table.exec{width:100%;border-collapse:collapse;font-size:13px;background:var(--panel)}
-table.exec th{background:var(--ink);color:#fff;font:700 11.5px var(--cond);padding:10px 12px;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:1}
-table.exec td{padding:9px 12px;border-bottom:1px solid var(--shade);vertical-align:top}
-table.exec tr:last-child td{border:0}
-table.exec tr:hover td{background:var(--field)}
-table.exec tr.cut-row td{background:rgba(217,65,65,.05)}
-.dpill{display:inline-block;font:700 11px var(--cond);padding:2px 8px;border-radius:10px;color:#fff;white-space:nowrap}
-.cpill{display:inline-block;font:600 11px var(--sans);padding:2px 8px;border-radius:10px;color:#fff;white-space:nowrap}
-.pre-list{font-size:11px;color:var(--ink-2);max-width:200px}
+table.exec th{background:var(--bar);color:#fff;font:700 11.5px var(--cond);padding:9px 10px;text-align:left;white-space:nowrap;position:sticky;top:0}
+table.exec td{padding:8px 10px;border-bottom:1px solid var(--shade);vertical-align:top}
+table.exec tr.dayrow td{background:var(--field);font:700 13px var(--cond);color:var(--ink)}
+table.exec tr.out td{background:rgba(217,65,65,.05)}
+table.exec tr.done td{opacity:.45}
+table.exec tr.done td.nm{text-decoration:line-through}
+.dpill,.ipill{display:inline-block;font:700 11px var(--cond);padding:2px 8px;border-radius:10px;color:#fff;white-space:nowrap}
+.ipill.Outage{background:var(--red)}.ipill.SA{background:var(--amber);color:var(--amber-dk)}.ipill.Non-SA{background:var(--ink-2)}
+.who{font-size:12px;color:var(--ink-2)}
+.desc{font-size:12px;color:var(--ink-2);margin-top:2px}
+.rem{font-size:12px;color:#8A5A00}
 .chk{width:16px;height:16px;cursor:pointer;accent-color:var(--green)}
-.seq{font:700 12px var(--cond);color:var(--ink-2)}
-.dur{font:600 12px var(--cond);white-space:nowrap}
+.num{font:700 12px var(--cond);color:var(--ink-2);white-space:nowrap}
+.time{font:600 12px var(--cond);white-space:nowrap}
 
-#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 18px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:99}
+/* checklist print */
+.ckl{position:fixed;inset:0;z-index:50;background:#fff;color:#111;overflow:auto;padding:24px 32px}
+.ckl h1{font:700 22px var(--cond);margin:0 0 4px}
+.ckl .meta{font-size:12px;color:#555;margin-bottom:14px}
+.ckl h2{font:700 15px var(--cond);margin:16px 0 6px;border-bottom:2px solid #111;padding-bottom:3px}
+.ckl .st{display:flex;gap:10px;padding:5px 0;border-bottom:1px solid #ddd;font-size:12.5px;break-inside:avoid}
+.ckl .box{width:14px;height:14px;border:1.5px solid #333;border-radius:2px;flex-shrink:0;margin-top:2px}
+.ckl .st small{display:block;color:#666}
+.ckl-act{display:flex;gap:8px;margin-bottom:14px}
+.ckl-act button{border:0;border-radius:6px;padding:8px 14px;font:700 13px var(--cond);cursor:pointer;background:#172230;color:#fff}
+.ckl-act button.p{background:#F2A20C;color:#3B2600}
+@media print{body>*:not(.ckl){display:none!important}.ckl{position:static;padding:0}.ckl-act{display:none}}
+
+/* file import */
+.drop{display:flex;align-items:center;gap:14px;padding:16px 18px;border:2px dashed var(--line);border-radius:10px;background:var(--panel);cursor:pointer;margin-bottom:16px;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--blue);background:rgba(63,111,216,.05)}
+.drop svg{width:30px;height:30px;color:var(--blue);flex-shrink:0}
+.drop b{font:700 15px var(--cond)}
+.drop p{margin:2px 0 0;font-size:12.5px;color:var(--ink-2)}
+.drop .pick{margin-left:auto;background:var(--blue);color:#fff;border:0;border-radius:6px;padding:8px 14px;font:700 13px var(--cond);cursor:pointer;white-space:nowrap}
+.fbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:16px;overflow:hidden}
+.fhead{display:flex;gap:10px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--shade);flex-wrap:wrap}
+.fhead b{font:700 15px var(--cond)}
+.fhead span{font-size:12.5px;color:var(--ink-2)}
+.fhead .x{margin-left:auto;background:none;border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;color:var(--ink-2)}
+.fnote{padding:8px 18px;font-size:12.5px;background:#FFF8E6;color:#7A5200;border-bottom:1px solid var(--shade)}
+.ftbl{width:100%;border-collapse:collapse;font-size:13px}
+.ftbl th{font:700 11px var(--cond);text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);text-align:left;padding:8px 10px;border-bottom:1px solid var(--shade)}
+.ftbl td{padding:7px 10px;border-bottom:1px solid var(--shade);vertical-align:top}
+.ftbl tr.off td{opacity:.45}
+.ftbl input[type=text],.ftbl input[type=number],.ftbl textarea{width:100%;background:var(--field);border:1px solid var(--line);border-radius:5px;padding:6px 8px;font-size:13px}
+.ftbl textarea{min-height:52px;resize:vertical;font:13px/1.45 var(--sans)}
+.ftbl input.need{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}
+.ftbl .mini{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.ftbl .mini span{font-size:11.5px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:1px 7px;color:var(--ink-2)}
+.ftbl .mini span.bad{background:#FFF3CD;color:#856404;border-color:#F3DE9B}
+.ffoot{padding:10px 18px;font-size:12.5px;color:var(--ink-2);display:flex;gap:16px;flex-wrap:wrap}
+.tsel{background:rgba(255,255,255,.08);border:1px solid #5E7185;color:#fff;border-radius:7px;padding:7px 10px;font:600 13px var(--sans);max-width:260px}
+.tsel option{color:#111}
+table.types{width:100%;border-collapse:collapse;font-size:13px}
+table.types th{font:700 11px var(--cond);text-transform:uppercase;color:var(--ink-2);text-align:left;padding:6px 8px;border-bottom:1px solid var(--shade)}
+table.types td{padding:7px 8px;border-bottom:1px solid var(--shade)}
+table.types tr{cursor:pointer}table.types tr:hover td{background:var(--field)}
+table.types tr.sel td{background:rgba(242,162,12,.12);font-weight:600}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#172230;color:#fff;padding:9px 18px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:99;max-width:90vw}
 #toast.on{opacity:1}
-@media(max-width:600px){.opts-row,.proj-row{grid-template-columns:1fr}}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}.gantt-scale{margin-left:140px}.gantt-step{grid-template-columns:140px 1fr}.crew-name{width:120px}}
 </style>
 </head>
 <body>
 
-<!-- SETUP -->
+<!-- ===================== SETUP ===================== -->
 <div id="pg-setup">
   <header class="bar">
     <a href="index.html" class="bar-back">← Back</a>
-    <div class="bar-mast">
-      <div class="bar-title">Auto MOP</div>
-      <div class="bar-sub">RAN + TRM · type your equipment, done</div>
-    </div>
+    <div class="bar-mast"><div class="bar-title">Auto MOP</div><div class="bar-sub">RAN + TRM · say it or type it, get the full MOP</div></div>
   </header>
 
   <div class="setup">
-    <h2>Auto MOP Generator</h2>
-    <p class="sub">Type your equipment list — the tool reads it and builds the full MOP automatically.</p>
-
-    <div class="proj-row">
-      <label>Project name<input id="p-name" placeholder="e.g. Cairo North Hub — 5G Upgrade"></label>
-      <label>Country<input id="p-country" placeholder="e.g. Egypt"></label>
-    </div>
+    <h2>Describe the job</h2>
+    <p class="sub">Type or speak in plain words: the equipment, how many sites or links, the kind of job (swap, expansion, hot swap…) and the outage time. The tool builds the full step-by-step MOP with the same engine, Excel and PDF as the main editor.</p>
 
     <div class="eq-box">
       <div class="eq-box-head">
-        <div class="eq-box-head-text">
-          <b>Equipment list</b>
-          <p>Format: <code>QTYx New/Reuse MODEL</code> — separate items with <code>+</code> or new lines. Bands and notes in parentheses are fine.</p>
+        <div class="eq-box-head-text"><b>Job description</b><p>English or Arabic. Model names like 4486, AIR 3219, RAU 6363, ML 6691 are recognised.</p></div>
+        <div class="voice" id="voice" hidden>
+          <select id="mic-lang" aria-label="Voice language"><option value="en-US">English</option><option value="en-GB">English (UK)</option><option value="ar-EG">العربية (مصر)</option><option value="ar-SA">العربية (السعودية)</option></select>
+          <label class="autob" title="Build the MOP automatically when the recording stops"><input type="checkbox" id="auto-build" checked> Build when I stop</label>
+          <button class="mic-btn" id="mic-btn" title="Speak (stops automatically after 1 minute)">
+            <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+            <span class="mic-dot"></span><span id="mic-lbl">Speak · 1 min</span><span class="prog" id="mic-prog"></span>
+          </button>
         </div>
-        <button class="mic-btn" id="mic-btn" title="Speak your equipment list" hidden>
-          <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="2" width="6" height="11" rx="3"/>
-            <path d="M5 10a7 7 0 0 0 14 0"/>
-            <line x1="12" y1="19" x2="12" y2="22"/>
-            <line x1="8" y1="22" x2="16" y2="22"/>
-          </svg>
-          <span class="mic-ring"></span>
-          <span id="mic-lbl">Voice</span>
-        </button>
       </div>
       <div class="mic-interim" id="mic-interim"></div>
-      <textarea class="eq-textarea" id="eq-text" placeholder="Examples:
-3x New Radio 4486 B8B20B28 + 3x New Radio 4490 B1B3 + 3x AIR 3219 B42
-1x Reuse BB5212 (3G) + 1x New RP6655 (4G+5G)
-
-or line by line:
-2x New MW Antenna + 2x New RAU + 2x New IDU ML6630"></textarea>
-      <div class="parse-preview" id="preview">
-        <div class="plabel">Parsed equipment — appears as you type</div>
-        <div class="chips" id="chips"></div>
+      <textarea class="eq-textarea" id="eq-text" dir="auto" placeholder="Example:
+Swap for 12 sites in Egypt, 2 days, outage on day 2 at 9 am, max 4 hours.
+3 new radio 4486 B8B20B28, 3 new radio 4490 B1B3 and 3 AIR 3219 B42.
+New baseband RP6655 for 4G and 5G, reuse BB5212 for 3G, dismantle 6 old RRUs."></textarea>
+      <div class="examples">
+        <button class="ex" data-ex="ran">Example: RAN swap</button>
+        <button class="ex" data-ex="exp">Example: expansion</button>
+        <button class="ex" data-ex="trm">Example: MW link swap</button>
+        <button class="ex" data-ex="hot">Example: hot swap + SD</button>
+        <button class="ex" data-ex="clr">Clear</button>
+      </div>
+      <div class="und" id="und">
+        <div class="plabel">What I understood</div>
+        <div id="und-body"><div class="empty-und">Start typing or press Speak — what the tool understands appears here as you go.</div></div>
       </div>
     </div>
 
-    <div class="opts-row">
-      <label>Max hours / day
-        <select id="o-maxh">
-          <option value="480">8 h</option>
-          <option value="540">9 h</option>
-          <option value="600">10 h</option>
-          <option value="660">11 h</option>
-          <option value="720">12 h</option>
-        </select>
-      </label>
-      <label>Day starts at<input type="time" id="o-start" value="07:00"></label>
-      <label>Cutover
-        <select id="o-cutover">
-          <option value="0">No outage</option>
-          <option value="1">Day 1</option>
-          <option value="2">Day 2</option>
-          <option value="3">Day 3</option>
-          <option value="4">Day 4</option>
-          <option value="5">Day 5</option>
-        </select>
-      </label>
-    </div>
+    <label class="drop" id="drop" for="file-in">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+      <div><b>Or upload a project file</b><p>Solution document, BoQ, LLD or RAN solution sheet – Excel (.xlsx), Word (.docx) or PDF. Each config / model becomes a site type. The file is read on this computer only.</p></div>
+      <span class="pick">Choose file</span>
+      <input type="file" id="file-in" accept=".xlsx,.xlsm,.docx,.pdf,.csv,.txt" hidden>
+    </label>
+    <div class="fbox" id="fbox" hidden></div>
 
-    <button class="btn-gen-big" id="btn-gen">Generate MOP →</button>
+    <details class="adj" id="adj">
+      <summary>Adjust <small>filled in from your words — change anything; changed fields stay as you set them</small></summary>
+      <div class="adj-grid">
+        <label>Project<input data-k="name" placeholder="Project name"></label>
+        <label>Country<input data-k="country" placeholder="Country"></label>
+        <label>Sites / links<input type="number" min="1" data-k="sites"></label>
+        <label class="ran-f">RAN job<select data-k="ranScenario"><option value="">Auto</option><option value="swap">Swap / modernization</option><option value="exp">Expansion</option><option value="g5">5G AIR add only</option><option value="nsb">New site build</option></select></label>
+        <label class="trm-f">TRM job<select data-k="trmMethod"><option value="">Auto</option><option value="normal">Normal swap (1 team)</option><option value="hot">Hot swap (2 teams)</option><option value="out2">Outdoor swap, 2 teams</option><option value="upg">1+0 → 2+0 upgrade</option><option value="idu">IDU / NPU swap only</option><option value="radswap">Radio swap only</option><option value="new">New link</option><option value="dism">Dismantling only</option></select></label>
+        <label>Days<select data-k="days"><option value="">Auto</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        <label>Outage day<select data-k="outageDay"><option value="">Auto</option><option value="0">No outage</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        <label>Outage start<input type="time" data-k="outStart"></label>
+        <label>Max outage (h)<input type="number" min="0.5" max="12" step="0.5" data-k="outMax"></label>
+        <label>Team on site<input type="time" data-k="arrive"></label>
+        <label>Max hours / day<input type="number" min="4" max="16" step="0.5" data-k="maxHours"></label>
+        <label class="ran-f">Old RRUs to dismantle<input type="number" min="0" data-k="legacyRRU"></label>
+      </div>
+    </details>
+
+    <button class="btn-gen-big" id="btn-gen">Build the MOP →</button>
+    <div class="kbd">Ctrl + Enter also builds it</div>
   </div>
 </div>
 
-<!-- MOP -->
+<!-- ===================== MOP ===================== -->
 <div id="pg-mop" hidden>
   <header class="bar">
     <button class="bar-back" id="btn-edit">← Edit</button>
+    <div class="vtabs" id="dtabs" hidden></div>
+    <select class="tsel" id="tsel" hidden aria-label="Site type"></select>
     <div class="vtabs">
-      <button class="vtab active" data-v="dashboard">Dashboard</button>
-      <button class="vtab" data-v="gantt">Gantt</button>
-      <button class="vtab" data-v="table">Execution Table</button>
+      <button class="vtab active" data-v="overview">Overview</button>
+      <button class="vtab" data-v="timeline">Timeline</button>
+      <button class="vtab" data-v="steps">Steps</button>
     </div>
     <div class="bar-spacer"></div>
+    <button class="gen plain" id="btn-ckl" title="Printable field checklist">Checklist</button>
+    <button class="gen plain" id="btn-open" title="Add this MOP to the main editor to fine-tune it">Open in editor</button>
     <button class="gen ghost" id="btn-pdf">PDF</button>
     <button class="gen" id="btn-xl">Excel</button>
   </header>
   <div class="mop-wrap">
-    <div id="v-dashboard"></div>
-    <div id="v-gantt" hidden></div>
-    <div id="v-table" hidden></div>
+    <div id="v-overview"></div>
+    <div id="v-timeline" hidden></div>
+    <div id="v-steps" hidden></div>
   </div>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status"></div>
 
+<script src="vendor/exceljs.min.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="js/core.js"></script>
+<script src="js/auto-parse.js"></script>
+<script src="js/auto-import.js"></script>
 <script>
-// ════════════════════════════════════════════════
-//  KNOWLEDGE BASE
-// ════════════════════════════════════════════════
-const KB = {
-  "Radio Unit": {
-    pat:[/^radio\s*\d/i,/^rru/i,/^rp\d/i,/^2219|^2255|^4486|^4488|^4490|^6449|^6488|^6646|^6649|^4415/i],
-    aliases:["rru","radio","radio unit","ericsson radio","radio port"],
-    cat:"RAN",
-    new:[
-      {k:"bracket",n:"Install mounting bracket",           m:15,c:"Tower crew",      p:[]},
-      {k:"mount",  n:"Hoist and mount radio unit",         m:20,c:"Tower crew",      p:["bracket"]},
-      {k:"ground", n:"Ground radio unit",                  m:10,c:"Tower crew",      p:["mount"]},
-      {k:"rf",     n:"Run RF / jumper cables",             m:20,c:"Tower crew",      p:["mount"]},
-      {k:"dc",     n:"Run DC power cable",                 m:15,c:"Tower crew",      p:["mount"]},
-      {k:"cpri",   n:"CPRI / fiber connection at baseband",m:15,c:"Ground tech",     p:["dc","rf"]}
-    ],
-    reu:[
-      {k:"dis",    n:"Disconnect and dismantle existing radio",m:20,c:"Tower crew",  p:[]},
-      {k:"mount",  n:"Mount replacement radio unit",          m:20,c:"Tower crew",  p:["dis"]},
-      {k:"rf",     n:"Reconnect RF / jumper cables",          m:10,c:"Tower crew",  p:["mount"]},
-      {k:"dc",     n:"Reconnect DC power cable",              m:10,c:"Tower crew",  p:["mount"]},
-      {k:"cpri",   n:"Reconnect CPRI / fiber at baseband",    m:10,c:"Ground tech", p:["dc","rf"]}
-    ]
-  },
-  "5G AIR Unit": {
-    pat:[/^air\s*\d/i,/^3219|^3246|^6449|^6488|^3298/i],
-    aliases:["air","airrus","5g air","air unit"],
-    cat:"RAN",
-    new:[
-      {k:"bracket", n:"Install AIR mounting bracket",    m:20,c:"Tower crew",  p:[]},
-      {k:"mount",   n:"Hoist and mount AIR unit",        m:30,c:"Tower crew",  p:["bracket"]},
-      {k:"ground",  n:"Ground AIR unit",                 m:10,c:"Tower crew",  p:["mount"]},
-      {k:"fiber",   n:"Route CPRI fiber to shelter",     m:25,c:"Tower crew",  p:["mount"]},
-      {k:"dc",      n:"Route DC power cable",            m:20,c:"Tower crew",  p:["mount"]},
-      {k:"fiber_bb",n:"Terminate fiber at DU / BBU",     m:15,c:"Ground tech", p:["fiber"]},
-      {k:"align",   n:"AIR unit alignment check",        m:20,c:"Tower crew",  p:["mount"]}
-    ],
-    reu:[
-      {k:"dis",   n:"Dismantle existing AIR unit",       m:25,c:"Tower crew",  p:[]},
-      {k:"mount", n:"Mount replacement AIR unit",        m:30,c:"Tower crew",  p:["dis"]},
-      {k:"fiber", n:"Reconnect CPRI fiber",              m:10,c:"Tower crew",  p:["mount"]},
-      {k:"dc",    n:"Reconnect DC power",                m:10,c:"Tower crew",  p:["mount"]},
-      {k:"ground",n:"Ground AIR unit",                   m:10,c:"Tower crew",  p:["mount"]},
-      {k:"align", n:"AIR unit alignment check",          m:20,c:"Tower crew",  p:["mount"]}
-    ]
-  },
-  "Baseband Unit": {
-    pat:[/^bb\s*\d/i,/^baseband/i,/^bbu/i,/^du\s*\d/i,/^5212|^5216|^5272|^6630|^6648|^6360/i],
-    aliases:["bbu","du","baseband","cudu","dpb","dus"],
-    cat:"RAN",
-    new:[
-      {k:"rack",  n:"Mount BBU / DU in rack or cabinet",       m:30,c:"Ground tech",      p:[]},
-      {k:"ground",n:"Ground BBU / DU",                         m:10,c:"Ground tech",      p:["rack"]},
-      {k:"power", n:"Connect DC power",                        m:20,c:"Ground tech",      p:["rack"]},
-      {k:"cpri",  n:"Connect CPRI / eCPRI ports",              m:20,c:"Ground tech",      p:["rack"]},
-      {k:"eth",   n:"Connect Ethernet / management cables",    m:15,c:"Ground tech",      p:["rack"]},
-      {k:"sw",    n:"Software load and license activation",    m:30,c:"Remote integrator",p:["power","eth"]}
-    ],
-    reu:[
-      {k:"backup", n:"Take configuration backup",           m:20,c:"Remote integrator",p:[]},
-      {k:"off",    n:"Controlled power-off",                m:10,c:"Ground tech",      p:["backup"]},
-      {k:"dis",    n:"Disconnect all cables",               m:20,c:"Ground tech",      p:["off"]},
-      {k:"replace",n:"Replace BBU / DU unit",              m:25,c:"Ground tech",      p:["dis"]},
-      {k:"recon",  n:"Reconnect all cables",               m:20,c:"Ground tech",      p:["replace"]},
-      {k:"restore",n:"Restore configuration and verify",   m:30,c:"Remote integrator",p:["recon"]}
-    ]
-  },
-  "Sector Antenna": {
-    pat:[/^antenna/i,/^sector/i,/^passive ant/i],
-    aliases:["antenna","sector","passive antenna","anten","ants","cross-dipole"],
-    cat:"RAN",
-    new:[
-      {k:"bracket",n:"Install antenna mounting bracket",m:20,c:"Tower crew",p:[]},
-      {k:"mount",  n:"Hoist and mount antenna",        m:25,c:"Tower crew",p:["bracket"]},
-      {k:"jumper", n:"Connect jumper cables",          m:15,c:"Tower crew",p:["mount"]},
-      {k:"align",  n:"Set azimuth and mechanical tilt",m:20,c:"Tower crew",p:["mount"]}
-    ],
-    reu:[
-      {k:"dis",   n:"Dismantle existing antenna",    m:20,c:"Tower crew",p:[]},
-      {k:"mount", n:"Mount new antenna",             m:25,c:"Tower crew",p:["dis"]},
-      {k:"jumper",n:"Reconnect jumper cables",       m:10,c:"Tower crew",p:["mount"]},
-      {k:"align", n:"Re-align azimuth and tilt",     m:20,c:"Tower crew",p:["mount"]}
-    ]
-  },
-  "RBS Cabinet": {
-    pat:[/^rbs\s*\d/i,/^ers\s*\d/i,/^cabinet/i,/^outdoor cab/i],
-    aliases:["rbs","cabinet","ers","outdoor cabinet"],
-    cat:"RAN",
-    new:[
-      {k:"pos",   n:"Position and level cabinet",            m:30,c:"Ground tech",p:[]},
-      {k:"anchor",n:"Anchor cabinet to floor / foundation",  m:25,c:"Ground tech",p:["pos"]},
-      {k:"power", n:"Connect AC / DC power supply",          m:30,c:"Ground tech",p:["anchor"]},
-      {k:"ground",n:"Ground cabinet",                        m:15,c:"Ground tech",p:["anchor"]},
-      {k:"cables",n:"Route and dress feeder / fiber cables", m:25,c:"Ground tech",p:["pos"]}
-    ],
-    reu:[
-      {k:"inspect", n:"Inspect and clean cabinet",          m:20,c:"Ground tech",p:[]},
-      {k:"replace", n:"Replace faulty module or PSU",       m:30,c:"Ground tech",p:["inspect"]},
-      {k:"recon",   n:"Reconnect cables and verify power",  m:20,c:"Ground tech",p:["replace"]}
-    ]
-  },
-  "MW Antenna": {
-    pat:[/^mw ant/i,/^dish/i,/^parabolic/i,/^hp ant/i,/^microwave ant/i],
-    aliases:["mw antenna","dish","microwave antenna","parabolic","hp antenna"],
-    cat:"TRM",
-    new:[
-      {k:"bracket",  n:"Install antenna bracket / mount",         m:25,c:"Riggers",p:[]},
-      {k:"hoist",    n:"Hoist and mount dish",                    m:30,c:"Riggers",p:["bracket"]},
-      {k:"rough",    n:"Rough alignment — azimuth and elevation", m:20,c:"Riggers",p:["hoist"]},
-      {k:"waveguide",n:"Connect waveguide or coax cable",        m:20,c:"Riggers",p:["hoist"]}
-    ],
-    reu:[
-      {k:"dis",      n:"Dismantle and lower existing dish",  m:30,c:"Riggers",p:[]},
-      {k:"mount",    n:"Mount new dish",                     m:30,c:"Riggers",p:["dis"]},
-      {k:"waveguide",n:"Reconnect waveguide / coax",         m:20,c:"Riggers",p:["mount"]},
-      {k:"align",    n:"Fine alignment and link test",       m:30,c:"Riggers",p:["mount"]}
-    ]
-  },
-  "RAU / ODU": {
-    pat:[/^rau/i,/^odu/i,/^outdoor unit/i],
-    aliases:["rau","odu","outdoor unit","radio access unit","rau 03"],
-    cat:"TRM",
-    new:[
-      {k:"bracket",  n:"Mount RAU bracket",                  m:15,c:"Riggers",p:[]},
-      {k:"install",  n:"Install RAU / ODU unit",             m:20,c:"Riggers",p:["bracket"]},
-      {k:"waveguide",n:"Connect waveguide to antenna",       m:15,c:"Riggers",p:["install"]},
-      {k:"if",       n:"Run IF / Ethernet cable to IDU",     m:20,c:"Riggers",p:["install"]},
-      {k:"ground",   n:"Ground ODU",                         m:10,c:"Riggers",p:["install"]}
-    ],
-    reu:[
-      {k:"dis",      n:"Disconnect and remove existing RAU", m:15,c:"Riggers",p:[]},
-      {k:"install",  n:"Mount and install replacement RAU",  m:20,c:"Riggers",p:["dis"]},
-      {k:"waveguide",n:"Reconnect waveguide",                m:10,c:"Riggers",p:["install"]},
-      {k:"if",       n:"Reconnect IF / Ethernet cable",      m:10,c:"Riggers",p:["install"]},
-      {k:"ground",   n:"Ground ODU",                         m:10,c:"Riggers",p:["install"]}
-    ]
-  },
-  "IDU / ML 66xx": {
-    pat:[/^idu/i,/^ml\s*6[56]/i,/^indoor unit/i,/^6600|^6612|^6630|^6652/i],
-    aliases:["idu","ml 66","ml66","ml 6600","ml 6612","ml 6630","indoor unit"],
-    cat:"TRM",
-    new:[
-      {k:"rack",  n:"Rack-mount IDU",                            m:20,c:"FE / TX engineer",   p:[]},
-      {k:"power", n:"Connect DC power",                          m:15,c:"FE / TX engineer",   p:["rack"]},
-      {k:"if",    n:"Connect IF / Ethernet cable from ODU",      m:15,c:"FE / TX engineer",   p:["rack"]},
-      {k:"mgmt",  n:"Connect management / Ethernet",            m:10,c:"FE / TX engineer",   p:["rack"]},
-      {k:"config",n:"Configure and bring up radio link",         m:40,c:"Remote integrator",  p:["power","if","mgmt"]}
-    ],
-    reu:[
-      {k:"backup", n:"Backup current configuration",            m:20,c:"Remote integrator",  p:[]},
-      {k:"off",    n:"Controlled power-off",                    m:10,c:"FE / TX engineer",   p:["backup"]},
-      {k:"dis",    n:"Disconnect all cables",                   m:15,c:"FE / TX engineer",   p:["off"]},
-      {k:"replace",n:"Replace IDU unit",                        m:20,c:"FE / TX engineer",   p:["dis"]},
-      {k:"recon",  n:"Reconnect all cables",                    m:15,c:"FE / TX engineer",   p:["replace"]},
-      {k:"restore",n:"Restore configuration and verify link",   m:30,c:"Remote integrator",  p:["recon"]}
-    ]
-  },
-  "ML 6352": {
-    pat:[/^ml\s*63/i,/^minilink\s*63/i,/^mini-link\s*63/i],
-    aliases:["ml 6352","ml6352","mini-link 6352","minilink 6352"],
-    cat:"TRM",
-    new:[
-      {k:"mount",  n:"Mount ML 6352 bracket",         m:20,c:"Riggers",            p:[]},
-      {k:"install",n:"Install ML 6352 unit",          m:25,c:"Riggers",            p:["mount"]},
-      {k:"cable",  n:"Connect IF cable",              m:15,c:"Riggers",            p:["install"]},
-      {k:"eth",    n:"Connect Ethernet / PoE",        m:10,c:"FE / TX engineer",   p:["install"]},
-      {k:"config", n:"Configure and test link",       m:35,c:"Remote integrator",  p:["cable","eth"]}
-    ],
-    reu:[
-      {k:"backup", n:"Backup configuration",         m:15,c:"Remote integrator",  p:[]},
-      {k:"dis",    n:"Remove existing ML 6352",      m:20,c:"Riggers",            p:["backup"]},
-      {k:"install",n:"Install replacement ML 6352",  m:25,c:"Riggers",            p:["dis"]},
-      {k:"recon",  n:"Reconnect cables",             m:15,c:"Riggers",            p:["install"]},
-      {k:"config", n:"Restore config and verify",    m:25,c:"Remote integrator",  p:["recon"]}
-    ]
-  }
+const M = window.MOP, AP = window.AutoParse;
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 3500); }
+try { const th = localStorage.getItem("mop-theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
+
+// ===================== examples =====================
+const EX = {
+  ran: "Swap for 12 sites in Egypt, 2 days, outage on day 2 at 9 am, max 4 hours.\n3 new radio 4486 B8B20B28, 3 new radio 4490 B1B3 and 3 AIR 3219 B42.\nNew baseband RP6655 for 4G and 5G, reuse BB5212 for 3G, dismantle 6 old RRUs. 45 m monopole.",
+  exp: "Expansion on 5 sites, 1 day. Add 3 radio 4490 B1B3. Outage at 1 pm, max 2 hours.",
+  trm: "Normal swap for 6 MW links in Libya, outage at 11:30, max 6 hours.\nPer link end: 1 new 0.9m antenna, 2 RAU 6363 and 1 ML 6691 IDU.",
+  hot: "Hot swap, 4 links, outage at 11 am, max 9 hours. 1.2m dish, 1.2m SD antenna and 2 RAU 6365 per end.",
 };
+$$(".ex").forEach(b => b.onclick = () => { const ta = $("#eq-text"); ta.value = b.dataset.ex === "clr" ? "" : EX[b.dataset.ex]; touched = {}; $$(".adj-grid [data-k]").forEach(i => i.classList.remove("touched")); refresh(); ta.focus(); });
 
-const G_START=[
-  {id:"g_brief", n:"Safety briefing and site access",     m:15,c:"Team lead",p:[]},
-  {id:"g_survey",n:"Site survey and pre-work inspection", m:30,c:"Team lead",p:["g_brief"]}
-];
-const G_END=[
-  {id:"g_sat",    n:"Site Acceptance Test (SAT)",                   m:60,c:"Ground tech",p:[]},
-  {id:"g_cleanup",n:"Site cleanup and handover documentation",      m:30,c:"Team lead",  p:["g_sat"]}
-];
-
-// ════════════════════════════════════════════════
-//  PARSER
-// ════════════════════════════════════════════════
-function resolveEquip(raw) {
-  const n = raw.toLowerCase().trim();
-  for (const [key,val] of Object.entries(KB)) {
-    // Alias exact match
-    if (val.aliases && val.aliases.some(a => a.toLowerCase()===n)) return key;
-    // Key match
-    if (key.toLowerCase()===n) return key;
-    // Pattern match
-    if (val.pat && val.pat.some(p => p.test(raw.trim()))) return key;
-    // Alias substring
-    if (val.aliases && val.aliases.some(a => n.includes(a.toLowerCase()) || a.toLowerCase().includes(n))) return key;
-  }
-  return null;
-}
-
-function parseText(raw) {
-  if (!raw.trim()) return [];
-  // Split on + or newline, keeping items
-  const tokens = raw.replace(/\n/g,'+').split('+').map(t=>t.trim()).filter(t=>t);
-  const items = [];
-  for (const tok of tokens) {
-    // Strip band designators like B8B20B28, B1B3, B42, B78
-    let t = tok.replace(/\s+B\d+(?:[B+n]\d+)*/gi,'').trim();
-    // Strip parenthetical notes
-    t = t.replace(/\s*\([^)]*\)/g,'').trim();
-    // Match: {qty}x? {New|Reuse[d]?|Swap}? {model}
-    const m = t.match(/^(\d+)\s*[xX]?\s*(new|reuse[d]?|swap|old)?\s*(.+)$/i);
-    if (!m) continue;
-    const qty = Math.max(1,parseInt(m[1])||1);
-    const statusRaw = (m[2]||'new').toLowerCase();
-    const status = /^reuse|^swap|^old/.test(statusRaw) ? 'reused' : 'new';
-    const modelRaw = m[3].trim();
-    const equipKey = resolveEquip(modelRaw);
-    items.push({raw:tok, modelRaw, equipKey, status, qty});
-  }
-  return items;
-}
-
-function renderChips(items) {
-  const c = document.getElementById('chips');
-  if (!items.length) { c.innerHTML=''; return; }
-  c.innerHTML = items.map(it=>{
-    const ok = !!it.equipKey;
-    const cls = ok ? (it.status==='reused'?'chip reused':'chip ok') : 'chip warn';
-    const label = ok ? it.equipKey : it.modelRaw+' (unknown — generic step)';
-    return `<span class="${cls}"><span class="chip-qty">${it.qty}×</span><span class="chip-eq">${label}</span><span class="chip-status">${it.status}</span></span>`;
-  }).join('');
-}
-
-document.getElementById('eq-text').addEventListener('input',()=>{
-  const items = parseText(document.getElementById('eq-text').value);
-  renderChips(items);
-});
-
-// ════════════════════════════════════════════════
-//  VOICE INPUT
-// ════════════════════════════════════════════════
-(function(){
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const btn = document.getElementById('mic-btn');
-  const lbl = document.getElementById('mic-lbl');
-  const interim = document.getElementById('mic-interim');
-  const ta = document.getElementById('eq-text');
-  if (!SpeechRec) return;
-  btn.hidden = false;
-
-  const rec = new SpeechRec();
-  rec.continuous = false;      // let browser stop naturally; we restart manually
-  rec.interimResults = true;
-  rec.lang = 'en-US';
-
-  // States: idle → starting → listening → stopping → idle
-  let state = 'idle';
-  let finalBuffer = '';
-
-  function uiOn()  { btn.classList.add('listening'); lbl.textContent = 'Stop'; interim.textContent = '🎤 Listening…'; }
-  function uiOff() { btn.classList.remove('listening'); lbl.textContent = 'Voice'; interim.textContent = ''; }
-
-  function doStart() {
-    if (state !== 'idle') return;
-    state = 'starting';
-    finalBuffer = ta.value.trim();
-    try { rec.start(); }
-    catch(e) { state = 'idle'; interim.textContent = '⚠ ' + e.message; }
-  }
-
-  function doStop() {
-    if (state === 'idle' || state === 'stopping') return;
-    state = 'stopping';
-    try { rec.abort(); } catch(_) {}
-  }
-
-  rec.onstart  = () => { state = 'listening'; uiOn(); };
-
-  rec.onresult = (e) => {
-    let interimStr = '', newFinal = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) newFinal += t + ' ';
-      else interimStr += t;
-    }
-    if (newFinal) {
-      finalBuffer = (finalBuffer ? finalBuffer + '\n' : '') + newFinal.trim();
-      ta.value = finalBuffer;
-      renderChips(parseText(ta.value));
-    }
-    interim.textContent = interimStr ? `🎤 "${interimStr}"` : '🎤 Listening…';
-  };
-
-  rec.onerror  = (e) => {
-    if (e.error === 'no-speech') return;   // browser timed out — onend will restart
-    if (e.error === 'not-allowed') { interim.textContent = '⚠ Mic denied — allow it in browser settings then refresh.'; state = 'stopping'; return; }
-    // other transient errors: just let onend handle restart
-  };
-
-  rec.onend = () => {
-    if (state === 'listening' || state === 'starting') {
-      // Browser auto-stopped (silence timeout) — restart after a brief pause
-      state = 'idle';
-      setTimeout(doStart, 120);
-    } else {
-      // User pressed Stop (state = 'stopping')
-      state = 'idle';
-      uiOff();
-    }
-  };
-
-  btn.addEventListener('click', () => {
-    if (state === 'idle') doStart();
-    else doStop();
+// ===================== understanding (live) =====================
+let U = null, touched = {};
+const RAN_SC = { swap: "Swap / modernization", exp: "Expansion", g5: "5G AIR add only", nsb: "New site build" };
+function refresh() {
+  U = AP.understand($("#eq-text").value);
+  const b = $("#und-body");
+  if (!$("#eq-text").value.trim()) { b.innerHTML = `<div class="empty-und">Start typing or press Speak — what the tool understands appears here as you go.</div>`; syncAdj(); return; }
+  const S = U.settings, setChips = [];
+  U.domains.forEach(d => setChips.push(`<span class="chip ${d.toLowerCase()}">${d === "RAN" ? "RAN site MOP" : "TRM MW link MOP"}</span>`));
+  if (U.domains.includes("RAN")) { const sc = S.ranScenario; setChips.push(`<span class="chip set">${sc ? RAN_SC[sc] : "RAN job: auto"}</span>`); }
+  if (U.domains.includes("TRM")) { const mt = S.trmMethod; setChips.push(`<span class="chip set">${mt ? M.TRM_METHODS[mt].label : "TRM method: auto"}</span>`); }
+  if (S.days) setChips.push(`<span class="chip set">${S.days} day${S.days > 1 ? "s" : ""}</span>`);
+  U.got.forEach(g => setChips.push(`<span class="chip set">${esc(g)}</span>`));
+  const eq = U.items.map(i => {
+    if (i.cat === "unknown") return `<span class="chip warn" title="${esc(i.warn)}">? ${esc(i.model)}</span>`;
+    const cls = i.cat === "bb" ? (i.status === "Reused" ? "chip bbr" : "chip ran") : i.status === "Reused" ? "chip reused" : `chip ${i.dom.toLowerCase()}`;
+    const extra = i.cat === "bb" ? `${i.status} · ${i.tech}` : i.status === "Reused" ? "reused – not installed" : (i.role || "");
+    return `<span class="${cls}" ${i.warn ? `title="${esc(i.warn)}"` : ""}><span class="chip-qty">${i.qty}×</span>${esc(i.model)}<span class="chip-s">${esc(extra)}</span></span>`;
   });
+  const warns = U.items.filter(i => i.warn).map(i => `<li>${esc(i.model)}: ${esc(i.warn)}</li>`);
+  if (!U.items.some(i => i.dom)) warns.push("<li>No equipment recognised yet — say e.g. “3 new radio 4486” or “2 RAU 6363”.</li>");
+  if (U.domains.includes("RAN") && !U.items.some(i => i.cat === "bb")) warns.push("<li>No baseband mentioned — the MOP will have no baseband steps.</li>");
+  b.innerHTML = `<div class="chips">${setChips.join("") || '<span class="empty-und">No job settings yet (sites, outage time, swap type…)</span>'}</div>
+    <div class="plabel" style="margin-top:6px">Equipment${U.domains.includes("TRM") ? " (TRM: per link end)" : ""}</div><div class="chips">${eq.join("") || '<span class="empty-und">—</span>'}</div>
+    ${warns.length ? `<ul class="ulist" style="color:#856404">${warns.join("")}</ul>` : ""}`;
+  syncAdj();
+}
+function syncAdj() {
+  const S = (U && U.settings) || {};
+  $$(".adj-grid [data-k]").forEach(el => { const k = el.dataset.k; if (touched[k]) return; el.value = S[k] !== undefined ? S[k] : ""; });
+  const has = d => U && U.domains.includes(d);
+  $$(".ran-f").forEach(e => e.hidden = !has("RAN")); $$(".trm-f").forEach(e => e.hidden = !has("TRM"));
+}
+$$(".adj-grid [data-k]").forEach(el => { const f = () => { touched[el.dataset.k] = el.value !== ""; el.classList.toggle("touched", el.value !== ""); }; el.addEventListener("input", f); el.addEventListener("change", f); });
+$("#eq-text").addEventListener("input", refresh);
+$("#eq-text").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); build(); } });
+function overrides() {
+  const o = {};
+  $$(".adj-grid [data-k]").forEach(el => { const k = el.dataset.k; if (!touched[k] || el.value === "") return; const num = ["sites", "days", "outageDay", "outMax", "maxHours", "legacyRRU"].includes(k); o[k] = num ? +el.value : el.value; });
+  return o;
+}
+
+// ===================== voice: stops by itself after 60 s =====================
+(function () {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  $("#voice").hidden = false;
+  const LIMIT = 60000, btn = $("#mic-btn"), lbl = $("#mic-lbl"), prog = $("#mic-prog"), interim = $("#mic-interim"), ta = $("#eq-text");
+  let rec = null, on = false, tEnd = 0, timer = null, base = "", reason = "";
+  function make() {
+    const r = new SR(); r.continuous = true; r.interimResults = true; r.lang = $("#mic-lang").value;
+    r.onresult = e => {
+      let fin = "", mid = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) { const tx = e.results[i][0].transcript; if (e.results[i].isFinal) fin += tx + " "; else mid += tx; }
+      if (fin.trim()) { base = (base ? base + "\n" : "") + fin.trim(); ta.value = base; refresh(); }
+      interim.textContent = mid ? `🎤 “${mid}”` : "🎤 Listening…";
+    };
+    r.onerror = e => { if (e.error === "not-allowed" || e.error === "service-not-allowed") { reason = "denied"; stop(); } };
+    r.onend = () => { if (on && Date.now() < tEnd) { try { r.start(); } catch (_) { setTimeout(() => { try { r.start(); } catch (__) {} }, 150); } } else finish(); };
+    return r;
+  }
+  function tick() {
+    const left = Math.max(0, tEnd - Date.now()), s = Math.ceil(left / 1000);
+    lbl.textContent = `Stop · 0:${String(s).padStart(2, "0")}`; prog.style.width = `${100 - left / LIMIT * 100}%`;
+    if (left <= 0) { reason = "time"; stop(); }
+  }
+  function start() {
+    base = ta.value.trim(); reason = ""; on = true; tEnd = Date.now() + LIMIT;
+    rec = make(); try { rec.start(); } catch (e) { on = false; interim.textContent = "⚠ " + e.message; return; }
+    btn.classList.add("listening"); interim.textContent = "🎤 Listening… (stops by itself after 1 minute)"; tick(); timer = setInterval(tick, 200);
+  }
+  function stop() { if (!on) return; on = false; clearInterval(timer); try { rec.stop(); } catch (_) { finish(); } }
+  function finish() {
+    clearInterval(timer); on = false; btn.classList.remove("listening"); lbl.textContent = "Speak · 1 min"; prog.style.width = "0";
+    if (reason === "denied") { interim.textContent = "⚠ Microphone blocked — allow it in the browser settings, then try again."; return; }
+    interim.textContent = reason === "time" ? "⏱ Stopped after 1 minute." : "";
+    if (reason === "time") toast("Recording stopped after 1 minute.");
+    if ($("#auto-build").checked && U && U.items.some(i => i.dom)) setTimeout(build, 500);
+  }
+  btn.onclick = () => on ? (reason = "user", stop()) : start();
 })();
 
-// ════════════════════════════════════════════════
-//  STEP ENGINE
-// ════════════════════════════════════════════════
-function buildSteps(items) {
-  const steps=[];
-  for (const gs of G_START)
-    steps.push({id:gs.id,name:gs.n,equip:'General',dur:gs.m,crew:gs.c,pre:gs.p.slice(),day:0,s:0,e:0,seq:0,done:false,isG:true});
-
-  for (let i=0;i<items.length;i++) {
-    const it=items[i];
-    const kbE=it.equipKey?KB[it.equipKey]:null;
-    const defs=kbE?(it.status==='reused'?kbE.reu:kbE.new):null;
-    if (!defs) {
-      steps.push({id:`${i}_x`,name:`Install / connect ${it.modelRaw}${it.qty>1?` ×${it.qty}`:''}`,
-        equip:it.modelRaw,dur:60*it.qty,crew:'Ground tech',pre:['g_survey'],
-        day:0,s:0,e:0,seq:0,done:false});
-      continue;
-    }
-    for (const sd of defs) {
-      const pid=`${i}_${sd.k}`;
-      const pre=sd.p.map(p=>`${i}_${p}`);
-      if (!sd.p.length) pre.push('g_survey');
-      steps.push({id:pid,name:`${sd.n}${it.qty>1?` ×${it.qty}`:''}`,
-        equip:it.equipKey,dur:sd.m*it.qty,crew:sd.c,pre,day:0,s:0,e:0,seq:0,done:false});
-    }
-  }
-
-  // Leaf detection → SAT prereqs
-  const allPreIds=new Set(steps.flatMap(s=>s.pre));
-  const gIds=new Set(G_START.map(g=>g.id));
-  const leaves=steps.filter(s=>!allPreIds.has(s.id)&&!gIds.has(s.id)).map(s=>s.id);
-  for (let i=0;i<G_END.length;i++) {
-    const ge=G_END[i];
-    steps.push({id:ge.id,name:ge.n,equip:'General',dur:ge.m,crew:ge.c,
-      pre:i===0?leaves:[G_END[i-1].id],day:0,s:0,e:0,seq:0,done:false,isG:true});
-  }
-  return steps;
+// ===================== file import =====================
+let FILE = null; // { name, how, configs:[{name,sites,text,sitesKnown,qtyEstimated,on}], doc:{ranScenario,trmMethod,country,name} }
+const HOW = { BoQ: "BoQ tree (new items per config)", table: "config table", "model lines": "MODEL lines (LLD)", "scope text": "scope sentences" };
+function loadScript(src) { return new Promise((ok, no) => { if ([...document.scripts].some(x => x.src.endsWith(src))) return ok(); const e = document.createElement("script"); e.src = src; e.onload = ok; e.onerror = () => no(new Error("Could not load " + src)); document.head.appendChild(e); }); }
+async function pdfLib() {
+  if (!window.pdfjsLib) await loadScript("vendor/pdfjs/pdf.min.js");
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdfjs/pdf.worker.min.js";
+  return window.pdfjsLib;
 }
-
-function topoSort(steps) {
-  const byId=Object.fromEntries(steps.map(s=>[s.id,s]));
-  const vis=new Set(),res=[];
-  function dfs(s){if(vis.has(s.id))return;vis.add(s.id);s.pre.forEach(p=>{if(byId[p])dfs(byId[p]);});res.push(s);}
-  steps.forEach(dfs);
-  return res;
+async function readUpload(file) {
+  const box = $("#fbox"); box.hidden = false; box.innerHTML = `<div class="fhead"><b>${esc(file.name)}</b><span>Reading…</span></div>`;
+  try {
+    const libs = { ExcelJS: window.ExcelJS, pdfjsLib: /\.pdf$/i.test(file.name) ? await pdfLib() : null };
+    const doc = await window.AutoImport.readFile(file.name, await file.arrayBuffer(), libs);
+    const r = window.AutoImport.findConfigs(doc);
+    const ds = AP.settingsOf(AP.clean(r.text.slice(0, 8000))).s;
+    const nice = file.name.replace(/\.[^.]+$/, "").replace(/^[0-9a-f]{8}-/i, "").replace(/[_]+/g, " ").replace(/\s*-\s*(RAN )?(Solution|LLD|BoQ).*$/i, "").replace(/\b(Rev|Ver|PA)\s*-?\s*\d+.*$/i, "").trim().slice(0, 48);
+    FILE = { name: file.name, how: r.how, configs: r.configs.map(c => Object.assign({ on: true }, c)), doc: { ranScenario: ds.ranScenario, trmMethod: ds.trmMethod, country: ds.country, name: nice } };
+    renderFile();
+    if (!r.configs.length) toast("No site configurations found in this file.");
+    else toast(`${r.configs.length} configuration${r.configs.length > 1 ? "s" : ""} found.`);
+  } catch (e) { console.error(e); FILE = null; box.innerHTML = `<div class="fhead"><b>${esc(file.name)}</b><span style="color:var(--red)">⚠ ${esc(e.message || e)}</span><button class="x" data-fx="clear">Remove</button></div>`; }
 }
-
-function planDays(steps,maxMin,cutDay) {
-  const sorted=topoSort(steps);
-  const crewUsed={},stepDay={};
-  for (const s of sorted) {
-    const minD=s.pre.length?Math.max(...s.pre.map(p=>stepDay[p]||1)):1;
-    let d=minD;
-    for(;;){
-      const k=`${d}_${s.crew}`;
-      const u=crewUsed[k]||0;
-      if(u+s.dur<=maxMin){crewUsed[k]=u+s.dur;stepDay[s.id]=d;s.day=d;break;}
-      d++;
-    }
-  }
-
-  if (cutDay>0) {
-    const cD=Math.min(cutDay,Math.max(...steps.map(s=>s.day)));
-    const dIds=new Set(steps.filter(s=>s.day===cD).map(s=>s.id));
-    const dPre=new Set(steps.filter(s=>s.day===cD).flatMap(s=>s.pre));
-    const leaves=[...dIds].filter(id=>!dPre.has(id));
-    steps.push(
-      {id:'g_cut_dn',name:'Start outage — cells down',equip:'Cutover',dur:10,crew:'Remote integrator',pre:['g_survey'],day:cD,s:0,e:0,seq:0,done:false,isCut:true},
-      {id:'g_cut_up',name:'Cells up — restore traffic',equip:'Cutover',dur:10,crew:'Remote integrator',pre:leaves.length?leaves:['g_survey'],day:cD,s:0,e:0,seq:0,done:false,isCut:true},
-      {id:'g_cut_rfi',name:'RFI / service verification',equip:'Cutover',dur:30,crew:'Ground tech',pre:['g_cut_up'],day:cD,s:0,e:0,seq:0,done:false,isCut:true}
-    );
-    const sat=steps.find(s=>s.id==='g_sat');
-    if(sat){sat.pre=sat.pre.filter(p=>p!=='g_cut_rfi');sat.pre.push('g_cut_rfi');}
-  }
-
-  // Within-day scheduling
-  const days=[...new Set(steps.map(s=>s.day))].sort((a,b)=>a-b);
-  for (const d of days) {
-    const ds=steps.filter(s=>s.day===d);
-    const sorted2=topoSort(ds);
-    const crewE={},stepE={};
-    for(const s of sorted2){
-      const pre2=s.pre.filter(p=>stepE[p]!==undefined);
-      const pEnd=pre2.length?Math.max(...pre2.map(p=>stepE[p])):0;
-      const cEnd=crewE[s.crew]||0;
-      s.s=Math.max(pEnd,cEnd);s.e=s.s+s.dur;
-      crewE[s.crew]=s.e;stepE[s.id]=s.e;
-    }
-  }
-
-  // Sequence numbers
-  topoSort(steps).forEach((s,i)=>s.seq=i+1);
-  return steps;
-}
-
-// ════════════════════════════════════════════════
-//  HELPERS
-// ════════════════════════════════════════════════
-const CREW_COLORS={
-  'tower crew':'#F2A20C','rigger':'#F2A20C','ground tech':'#3F6FD8',
-  'fe / tx engineer':'#0F766E','remote integrator':'#8B5CF6','team lead':'#2F9E44'
-};
-function cc(crew){const k=crew.toLowerCase();for(const[m,c]of Object.entries(CREW_COLORS))if(k.includes(m))return c;return '#9AA7B6';}
-
-const DAY_COLORS=['#3F6FD8','#2F9E44','#F2A20C','#8B5CF6','#D94141','#0F766E'];
-function dc(d){return DAY_COLORS[(d-1)%DAY_COLORS.length];}
-
-function fmtDur(m){const h=Math.floor(m/60),mn=m%60;return h&&mn?`${h}h ${mn}m`:h?`${h}h`:`${mn}m`;}
-function toClock(baseMin,off){const t=baseMin+off,h=Math.floor(t/60)%24,m=t%60;return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;}
-function dayStart(ts){const[h,m]=(ts||'07:00').split(':').map(Number);return h*60+(m||0);}
-
-// ════════════════════════════════════════════════
-//  VIEWS
-// ════════════════════════════════════════════════
-function renderDash(steps,cutDay,maxMin) {
-  const days=[...new Set(steps.map(s=>s.day))].sort((a,b)=>a-b);
-  const totMin=steps.reduce((a,s)=>a+s.dur,0);
-  const crewMin={};
-  steps.forEach(s=>crewMin[s.crew]=(crewMin[s.crew]||0)+s.dur);
-  const maxC=Math.max(...Object.values(crewMin));
-
-  let h=`<div class="stat-row">
-    <div class="stat"><div class="n" style="color:var(--blue)">${days.length}</div><div class="l">Days on site</div></div>
-    <div class="stat"><div class="n" style="color:var(--amber)">${fmtDur(totMin)}</div><div class="l">Total crew-hours</div></div>
-    <div class="stat"><div class="n" style="color:var(--violet)">${steps.length}</div><div class="l">Total steps</div></div>
-  </div>
-  <div class="card"><h3>Day breakdown</h3>`;
-  for(const d of days){
-    const ds=steps.filter(s=>s.day===d);
-    const wall=Math.max(...ds.map(s=>s.e),0);
-    const pct=Math.min(100,wall/maxMin*100).toFixed(1);
-    const over=wall>maxMin,isCut=d===cutDay;
-    const fill=over?'var(--red)':isCut?'var(--red)':dc(d);
-    h+=`<div class="day-row${isCut?' cutover':''}">
-      <div class="dhead"><b>Day ${d}${isCut?' ⚡ Cutover':''}</b><span>${fmtDur(wall)} · ${ds.length} steps</span></div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${fill}"></div></div>
-    </div>`;
-  }
-  h+=`</div><div class="card"><h3>Crew hours</h3>`;
-  for(const[crew,min] of Object.entries(crewMin).sort((a,b)=>b[1]-a[1]))
-    h+=`<div class="crew-row"><div class="crew-dot" style="background:${cc(crew)}"></div>
-    <div class="crew-name">${crew}</div>
-    <div class="crew-bar-wrap"><div class="crew-bar-inner" style="width:${(min/maxC*100).toFixed(1)}%;background:${cc(crew)}"></div></div>
-    <div class="crew-hrs">${fmtDur(min)}</div></div>`;
-  h+=`</div>`;
-  document.getElementById('v-dashboard').innerHTML=h;
-}
-
-function renderGantt(steps,cutDay,startTS) {
-  const base=dayStart(startTS);
-  const days=[...new Set(steps.map(s=>s.day))].sort((a,b)=>a-b);
-  let h='';
-  for(const d of days){
-    const ds=steps.filter(s=>s.day===d);
-    const wMax=Math.max(...ds.map(s=>s.e),120);
-    const tick=wMax<=120?30:wMax<=300?60:120;
-    const isCut=d===cutDay;
-    const crewMap={};
-    ds.forEach(s=>{(crewMap[s.crew]=crewMap[s.crew]||[]).push(s);});
-    let ticks='';
-    for(let m=0;m<=wMax;m+=tick) ticks+=`<span style="left:${(m/wMax*100).toFixed(1)}%">${toClock(base,m)}</span>`;
-    h+=`<div class="gantt-day">
-    <div class="gantt-dhead"><b>Day ${d}${isCut?' ⚡':''}</b><span>${toClock(base,0)} → ${toClock(base,wMax)} · ${fmtDur(wMax)}</span></div>
-    <div class="gantt-scale">${ticks}</div>`;
-    for(const[crew,cs] of Object.entries(crewMap)){
-      h+=`<div class="gantt-crew"><div class="gantt-crew-lbl"><span style="width:8px;height:8px;background:${cc(crew)};border-radius:50%;display:inline-block"></span>${crew}</div>`;
-      for(const s of cs.sort((a,b)=>a.s-b.s)){
-        const lp=(s.s/wMax*100).toFixed(2),wp=(s.dur/wMax*100).toFixed(2);
-        const bg=s.isCut?'var(--red)':cc(s.crew);
-        h+=`<div class="gantt-step">
-          <div class="gantt-name" title="${s.name}">${s.seq}. ${s.name}</div>
-          <div class="gantt-track" style="--tick:${(tick/wMax*100).toFixed(2)}%">
-            <div class="gantt-bar" style="left:${lp}%;width:${wp}%;background:${bg}" title="${toClock(base,s.s)}→${toClock(base,s.e)} · ${fmtDur(s.dur)}">${s.dur>=25?fmtDur(s.dur):''}</div>
-          </div></div>`;
-      }
-      h+=`</div>`;
-    }
-    h+=`</div>`;
-  }
-  document.getElementById('v-gantt').innerHTML=h||'<div style="padding:40px;text-align:center;color:var(--ink-2)">No steps.</div>';
-}
-
-function renderTable(steps) {
-  const sorted=[...steps].sort((a,b)=>a.seq-b.seq);
-  let rows='';
-  for(const s of sorted){
-    const preNames=s.pre.map(pid=>{const ps=steps.find(x=>x.id===pid);return ps?`${ps.seq}.`:pid;}).join(' ');
-    rows+=`<tr class="${s.isCut?'cut-row':''}">
-      <td class="seq">${s.seq}</td>
-      <td><span class="dpill" style="background:${dc(s.day)}">Day ${s.day}</span></td>
-      <td>${s.name}${s.isCut?' <span style="color:var(--red)">⚡</span>':''}</td>
-      <td style="font-size:12px;color:var(--ink-2);font-style:italic">${s.equip}</td>
-      <td class="dur">${fmtDur(s.dur)}</td>
-      <td><span class="cpill" style="background:${cc(s.crew)}">${s.crew}</span></td>
-      <td class="pre-list">${preNames||'—'}</td>
-      <td><input type="checkbox" class="chk" data-id="${s.id}"${s.done?' checked':''}></td>
-    </tr>`;
-  }
-  document.getElementById('v-table').innerHTML=`<div class="tbl-wrap"><table class="exec">
-    <thead><tr><th>#</th><th>Day</th><th>Activity</th><th>Equipment</th><th>Duration</th><th>Crew</th><th>Prereqs #</th><th>✓</th></tr></thead>
-    <tbody>${rows}</tbody></table></div>`;
-  document.getElementById('v-table').querySelectorAll('.chk').forEach(cb=>{
-    cb.addEventListener('change',()=>{const s=ST.find(x=>x.id===cb.dataset.id);if(s)s.done=cb.checked;});
-  });
-}
-
-// ════════════════════════════════════════════════
-//  EXCEL EXPORT — PROFESSIONAL
-// ════════════════════════════════════════════════
-async function exportXL(steps,proj) {
-  if(!window.ExcelJS){toast('ExcelJS not loaded');return;}
-  const wb=new ExcelJS.Workbook();
-  wb.creator='MOP Generator';
-  wb.created=new Date();
-
-  // ── Sheet 1: Summary ──────────────────────────
-  const ws1=wb.addWorksheet('Summary',{views:[{showGridLines:false}]});
-  ws1.columns=[{width:28},{width:26},{width:20},{width:16}];
-
-  function hdr1(ws,txt,row,col,span,bg,fg,sz){
-    const c=ws.getCell(row,col);c.value=txt;
-    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg||'FF172230'}};
-    c.font={bold:true,color:{argb:fg||'FFFFFFFF'},size:sz||11,name:'Calibri'};
-    c.alignment={vertical:'middle',horizontal:'left'};
-    if(span>1) ws.mergeCells(row,col,row,col+span-1);
-    c.border={bottom:{style:'medium',color:{argb:'FF'+( bg?bg.slice(2):'172230')}}};
-  }
-  function val1(ws,lbl,v,row){
-    const lc=ws.getCell(row,1);lc.value=lbl;
-    lc.font={bold:true,size:10,name:'Calibri',color:{argb:'FF4A5868'}};
-    const vc=ws.getCell(row,2);vc.value=v;
-    vc.font={size:11,name:'Calibri'};
-    [lc,vc].forEach(c=>c.alignment={vertical:'middle'});
-  }
-
-  // Title block
-  hdr1(ws1,'MOP Generator — Auto Mode',1,1,4,'FF172230','FFFFFFFF',15);
-  ws1.getRow(1).height=28;
-  val1(ws1,'Project:',proj.name||'—',3);
-  val1(ws1,'Country:',proj.country||'—',4);
-  val1(ws1,'Date:',new Date().toLocaleDateString('en-GB'),5);
-  val1(ws1,'Generated by:','MOP Generator (Auto Mode)',6);
-  ws1.getRow(2).height=10;
-
-  // Stats
-  ws1.getRow(8).height=22;
-  hdr1(ws1,'SUMMARY',8,1,4,'FF1E3A5F','FFFFFFFF',11);
-  const days=[...new Set(steps.map(s=>s.day))].sort((a,b)=>a-b);
-  const totMin=steps.reduce((a,s)=>a+s.dur,0);
-  const crewM={};steps.forEach(s=>crewM[s.crew]=(crewM[s.crew]||0)+s.dur);
-  val1(ws1,'Days on site:',days.length,9);
-  val1(ws1,'Total steps:',steps.length,10);
-  val1(ws1,'Total crew-hours:',fmtDur(totMin),11);
-
-  ws1.getRow(13).height=22;
-  hdr1(ws1,'DAY BREAKDOWN',13,1,4,'FF1E3A5F','FFFFFFFF',11);
-  let dr=14;
-  for(const d of days){
-    const ds=steps.filter(s=>s.day===d);
-    const wall=Math.max(...ds.map(s=>s.e),0);
-    val1(ws1,`Day ${d}:`,`${fmtDur(wall)} critical path · ${ds.length} steps`,dr);
-    dr++;
-  }
-
-  ws1.getRow(dr+1).height=22;
-  hdr1(ws1,'CREW HOURS',dr+1,1,4,'FF1E3A5F','FFFFFFFF',11);
-  let cr=dr+2;
-  for(const[crew,min] of Object.entries(crewM).sort((a,b)=>b[1]-a[1])){
-    val1(ws1,crew+':',fmtDur(min),cr);cr++;
-  }
-
-  // ── Sheet 2: Execution Table ──────────────────
-  const ws2=wb.addWorksheet('Execution Table',{views:[{showGridLines:false,state:'frozen',xSplit:0,ySplit:1}]});
-  ws2.columns=[
-    {key:'seq',width:5},{key:'day',width:7},{key:'time',width:14},
-    {key:'name',width:44},{key:'equip',width:22},{key:'dur',width:12},
-    {key:'crew',width:24},{key:'pre',width:18},{key:'done',width:7}
-  ];
-
-  // Header row
-  const HR=['#','Day','Planned time','Activity / Description','Equipment','Duration','Crew','Prereqs #','Done'];
-  const hrow=ws2.addRow(HR);
-  hrow.height=22;
-  hrow.eachCell(c=>{
-    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF172230'}};
-    c.font={bold:true,color:{argb:'FFFFFFFF'},size:10,name:'Calibri'};
-    c.alignment={vertical:'middle',horizontal:'center'};
-    c.border={bottom:{style:'medium',color:{argb:'FF172230'}}};
-  });
-  hrow.getCell(4).alignment={vertical:'middle',horizontal:'left'};
-  hrow.getCell(5).alignment={vertical:'middle',horizontal:'left'};
-  hrow.getCell(7).alignment={vertical:'middle',horizontal:'left'};
-
-  // Day fill colors (light tints)
-  const DAY_FILLS=['FFE8F0FE','FFE6F4EA','FFFEF3C7','FFF3E8FF','FFFFE8E8','FFE6FAFA'];
-  const CUT_FILL='FFFFEAEA';
-
-  const sorted=[...steps].sort((a,b)=>a.seq-b.seq);
-  const base=dayStart(document.getElementById('o-start').value||'07:00');
-
-  for(const s of sorted){
-    const pre=s.pre.map(pid=>{const ps=steps.find(x=>x.id===pid);return ps?String(ps.seq):pid;}).join(', ');
-    const row=ws2.addRow([
-      s.seq,
-      `Day ${s.day}`,
-      `${toClock(base,s.s)} → ${toClock(base,s.e)}`,
-      s.name,
-      s.equip,
-      fmtDur(s.dur),
-      s.crew,
-      pre||'—',
-      ''
-    ]);
-    row.height=18;
-    const bg=s.isCut?CUT_FILL:DAY_FILLS[(s.day-1)%DAY_FILLS.length];
-    row.eachCell((c,ci)=>{
-      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
-      c.font={size:10,name:'Calibri'};
-      c.border={
-        top:{style:'thin',color:{argb:'FFD5DCE4'}},
-        bottom:{style:'thin',color:{argb:'FFD5DCE4'}},
-        left:{style:'thin',color:{argb:'FFD5DCE4'}},
-        right:{style:'thin',color:{argb:'FFD5DCE4'}}
-      };
-      c.alignment={vertical:'top'};
-      if(ci===1||ci===2||ci===3||ci===6||ci===8||ci===9) c.alignment={vertical:'middle',horizontal:'center'};
+function renderFile() {
+  const box = $("#fbox");
+  if (!FILE) { box.hidden = true; box.innerHTML = ""; return; }
+  const C = FILE.configs, unknown = C.some(c => !c.sitesKnown), est = C.some(c => c.qtyEstimated);
+  const tot = C.filter(c => c.on).reduce((a, c) => a + (+c.sites || 0), 0);
+  let h = `<div class="fhead"><b>📄 ${esc(FILE.name)}</b><span>${C.length ? `${C.length} configuration${C.length > 1 ? "s" : ""} from the ${esc(HOW[FILE.how] || FILE.how)}` : "nothing found"}${FILE.doc.country ? " · " + esc(FILE.doc.country) : ""}${FILE.doc.ranScenario ? " · " + esc(RAN_SC[FILE.doc.ranScenario]) : ""}</span><button class="x" data-fx="clear">Remove file</button></div>`;
+  if (unknown) h += `<div class="fnote">This file doesn't say how many sites use each model – enter the number of sites for each one (set to 1 for now).</div>`;
+  if (est) h += `<div class="fnote">Quantities per site are estimated from the totals in the text – check them against the site-wise analysis sheet.</div>`;
+  if (FILE.how === "BoQ") h += `<div class="fnote">A BoQ lists new items only – reused items (e.g. an existing BB5212) are not in it. Add them to the equipment text if they are part of the job.</div>`;
+  if (!C.length) h += `<div class="ffoot">Try the solution document or RAN solution sheet, or type the configuration in the box above.</div>`;
+  else {
+    h += `<table class="ftbl"><thead><tr><th style="width:34px">Use</th><th style="width:170px">Site type</th><th style="width:90px">Sites</th><th>Equipment per ${U && U.domains.includes("TRM") && !U.domains.includes("RAN") ? "link end" : "site"} (editable)</th></tr></thead><tbody>`;
+    C.forEach((c, i) => {
+      const it = AP.understand(c.text).items;
+      const mini = it.map(x => `<span class="${x.cat === "unknown" ? "bad" : ""}">${x.qty}× ${esc(x.model)}${x.status === "Reused" ? " (reused)" : ""}</span>`).join("");
+      h += `<tr class="${c.on ? "" : "off"}"><td><input type="checkbox" data-fi="${i}" data-ff="on" ${c.on ? "checked" : ""} aria-label="Use ${esc(c.name)}"></td>
+        <td><input type="text" data-fi="${i}" data-ff="name" value="${esc(c.name)}" maxlength="30"></td>
+        <td><input type="number" min="1" data-fi="${i}" data-ff="sites" value="${c.sites}" class="${c.sitesKnown ? "" : "need"}"></td>
+        <td><textarea data-fi="${i}" data-ff="text" rows="2">${esc(c.text)}</textarea><div class="mini" id="mini-${i}">${mini || '<span class="bad">no equipment recognised</span>'}</div></td></tr>`;
     });
-    row.getCell(4).alignment={vertical:'middle',horizontal:'left',wrapText:true};
-    row.getCell(5).alignment={vertical:'middle',horizontal:'left'};
-    row.getCell(7).alignment={vertical:'middle',horizontal:'left'};
-    // Bold seq
-    row.getCell(1).font={bold:true,size:10,name:'Calibri'};
-    // Day pill color
-    row.getCell(2).font={bold:true,size:10,name:'Calibri'};
+    h += `</tbody></table><div class="ffoot"><span><b>${C.filter(c => c.on).length}</b> site types · <b>${tot}</b> sites in total</span><span>Settings typed in the box above (outage time, days, job type…) apply to all of them.</span></div>`;
   }
+  box.innerHTML = h; box.hidden = false;
+}
+$("#file-in").addEventListener("change", e => { const f = e.target.files[0]; if (f) readUpload(f); e.target.value = ""; });
+const drop = $("#drop");
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) readUpload(f); });
+$("#fbox").addEventListener("click", e => { if (e.target.closest("[data-fx=clear]")) { FILE = null; renderFile(); } });
+$("#fbox").addEventListener("input", e => {
+  const el = e.target.closest("[data-fi]"); if (!el || !FILE) return; const c = FILE.configs[+el.dataset.fi], f = el.dataset.ff;
+  if (f === "on") { c.on = el.checked; el.closest("tr").classList.toggle("off", !c.on); }
+  else if (f === "sites") { c.sites = Math.max(1, +el.value || 1); c.sitesKnown = true; el.classList.remove("need"); }
+  else if (f === "name") c.name = el.value.trim() || c.name;
+  else if (f === "text") { c.text = el.value; const it = AP.understand(c.text).items; $("#mini-" + el.dataset.fi).innerHTML = it.map(x => `<span class="${x.cat === "unknown" ? "bad" : ""}">${x.qty}× ${esc(x.model)}${x.status === "Reused" ? " (reused)" : ""}</span>`).join("") || '<span class="bad">no equipment recognised</span>'; }
+  const tot = FILE.configs.filter(x => x.on).reduce((a, x) => a + (+x.sites || 0), 0), ff = $("#fbox .ffoot span"); if (ff) ff.innerHTML = `<b>${FILE.configs.filter(x => x.on).length}</b> site types · <b>${tot}</b> sites in total`;
+});
 
-  // Auto-filter on header
-  ws2.autoFilter={from:{row:1,column:1},to:{row:1,column:9}};
+// ===================== build =====================
+let STATES = {}, R = {}, DOM = "RAN", TI = 0, VIEW = "overview", DONE = {};
+const NIGHT = 360; // outage windows before 06:00 run as a night shift (team arrives the evening before)
+function forEngine(st) { // the engine counts minutes from 00:00 of the work day; push early-morning windows to the end of that day
+  const c = JSON.parse(JSON.stringify(st)), m = M.hm(c.project.outStart);
+  if (m < NIGHT && st.types.some(t => +t.outageDay > 0)) c.project.outStart = `${Math.floor(m / 60) + 24}:${String(m % 60).padStart(2, "0")}`;
+  return c;
+}
+function build() {
+  if (!U) refresh();
+  const ov = overrides();
+  let groups = null, u = U;
+  if (FILE && FILE.configs.some(c => c.on)) {
+    groups = FILE.configs.filter(c => c.on).map(c => ({ name: c.name, sites: c.sites, items: AP.understand(c.text).items })).filter(g => g.items.some(i => i.dom));
+    if (!groups.length) { toast("None of the file's configurations has recognisable equipment."); return; }
+    const S = Object.assign({}, U.settings); delete S.sites; // sites come from each config
+    ["ranScenario", "trmMethod", "country", "name"].forEach(k => { if (S[k] === undefined && FILE.doc[k]) S[k] = FILE.doc[k]; });
+    u = Object.assign({}, U, { settings: S }); delete ov.sites;
+  } else if (!U.domains.length || !U.items.some(i => i.dom)) { toast("Describe at least one piece of equipment (e.g. “3 new radio 4486”) or upload a file."); return; }
+  try { STATES = AP.buildStates(u, M, ov, groups); } catch (e) { console.error(e); toast("Could not build: " + e.message); return; }
+  R = {}; DONE = {};
+  for (const d in STATES) { const fe = forEngine(STATES[d]); R[d] = fe.types.map(t => M.schedule(fe, t)); }
+  DOM = STATES.RAN ? "RAN" : "TRM"; TI = 0;
+  const dt = $("#dtabs"); const ds = Object.keys(STATES);
+  dt.hidden = ds.length < 2; dt.innerHTML = ds.map(d => `<button class="vtab dtab ${d === DOM ? "active" : ""}" data-d="${d}">${d}</button>`).join("");
+  $("#pg-setup").hidden = true; $("#pg-mop").hidden = false; window.scrollTo(0, 0);
+  renderAll(); view("overview");
+}
+$("#btn-gen").onclick = build;
+$("#btn-edit").onclick = () => { $("#pg-mop").hidden = true; $("#pg-setup").hidden = false; };
+$("#dtabs").addEventListener("click", e => { const b = e.target.closest("[data-d]"); if (!b) return; DOM = b.dataset.d; TI = 0; $$("#dtabs .vtab").forEach(x => x.classList.toggle("active", x === b)); renderAll(); });
+$("#tsel").addEventListener("change", e => { TI = +e.target.value; renderAll(); });
+$$(".vtab[data-v]").forEach(b => b.onclick = () => view(b.dataset.v));
+function view(v) { VIEW = v; $$(".vtab[data-v]").forEach(b => b.classList.toggle("active", b.dataset.v === v)); ["overview", "timeline", "steps"].forEach(n => $("#v-" + n).hidden = n !== v); }
 
-  const buf=await wb.xlsx.writeBuffer();
-  dlBlob(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
-    (proj.name||'AutoMOP').replace(/[^\w\-]/g,'_')+'_MOP.xlsx');
-  toast('Excel downloaded.');
+// ===================== views =====================
+const WHO = [["tower|rigger", "#F2A20C"], ["ground", "#3F6FD8"], ["fe|tx|field eng", "#0F766E"], ["integr|noc|remote", "#8B5CF6"], ["lead|tl|all", "#2F9E44"]];
+const whoC = w => { const k = String(w || "").toLowerCase(); for (const [re, c] of WHO) if (new RegExp(re).test(k)) return c; return "#9AA7B6"; };
+const DAYC = ["#3F6FD8", "#2F9E44", "#F2A20C", "#8B5CF6", "#0F766E", "#D94141"];
+const steps = r => r.days.flatMap((d, di) => d.acts.filter(a => a.dur > 0).map((a, k) => ({ a, d, di, k, id: `${DOM}|${TI}|${di + 1}.${k + 1}|${a.key}` })));
+function renderAll() {
+  const ts = STATES[DOM].types, sel = $("#tsel");
+  sel.hidden = ts.length < 2; sel.innerHTML = ts.map((t, i) => `<option value="${i}" ${i === TI ? "selected" : ""}>${esc(t.name)} · ${t.sites} ${DOM === "TRM" ? "links" : "sites"}</option>`).join("");
+  renderOverview(); renderTimeline(); renderSteps();
 }
 
-// ════════════════════════════════════════════════
-//  PDF EXPORT — PROFESSIONAL
-// ════════════════════════════════════════════════
-async function exportPDF(steps,proj) {
-  if(!window.jspdf?.jsPDF){toast('jsPDF not loaded');return;}
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  const pw=doc.internal.pageSize.getWidth();
-  const base=dayStart(document.getElementById('o-start').value||'07:00');
-
-  // Header band
-  doc.setFillColor(23,34,48);
-  doc.rect(0,0,pw,18,'F');
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(13);
-  doc.setTextColor(255,255,255);
-  doc.text('MOP Generator — Auto Mode',10,11);
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(9);
-  doc.setTextColor(175,192,210);
-  const info=`${proj.name||'—'} · ${proj.country||''} · ${new Date().toLocaleDateString('en-GB')} · ${steps.length} steps`;
-  doc.text(info,pw-10,11,{align:'right'});
-
-  // Day legend
-  const days=[...new Set(steps.map(s=>s.day))].sort((a,b)=>a-b);
-  const LEG_COLS=[[62,112,216],[47,158,68],[242,162,12],[139,92,246],[217,65,65],[15,118,110]];
-  let lx=10;
-  doc.setFontSize(8);
-  for(const d of days){
-    const [r,g,b]=LEG_COLS[(d-1)%LEG_COLS.length];
-    doc.setFillColor(r,g,b);
-    doc.roundedRect(lx,20,3.5,3.5,0.5,0.5,'F');
-    doc.setTextColor(50,50,50);
-    doc.text(`Day ${d}`,lx+5,23.2);
-    lx+=22;
-  }
-
-  // Table
-  const sorted=[...steps].sort((a,b)=>a.seq-b.seq);
-  const DAY_RGB=[
-    [231,240,254],[230,244,234],[254,243,199],[243,232,255],[255,232,232],[230,250,250]
-  ];
-
-  doc.autoTable({
-    startY:28,
-    head:[[' #','Day','Time','Activity / Description','Equipment','Dur.','Crew','Pre #','✓']],
-    body:sorted.map(s=>{
-      const pre=s.pre.map(pid=>{const ps=steps.find(x=>x.id===pid);return ps?String(ps.seq):pid;}).join(' ');
-      return[s.seq,`Day ${s.day}`,`${toClock(base,s.s)}\n${toClock(base,s.e)}`,s.name,s.equip,fmtDur(s.dur),s.crew,pre||'—',''];
-    }),
-    styles:{fontSize:8,cellPadding:{top:2.5,bottom:2.5,left:2.5,right:2.5},font:'helvetica',valign:'middle'},
-    headStyles:{fillColor:[23,34,48],textColor:[255,255,255],fontStyle:'bold',fontSize:8.5,halign:'center'},
-    columnStyles:{
-      0:{cellWidth:8,halign:'center',fontStyle:'bold'},
-      1:{cellWidth:13,halign:'center',fontStyle:'bold'},
-      2:{cellWidth:18,halign:'center',fontSize:7.5},
-      3:{cellWidth:58},
-      4:{cellWidth:28,fontSize:7.5},
-      5:{cellWidth:12,halign:'center'},
-      6:{cellWidth:26},
-      7:{cellWidth:14,halign:'center'},
-      8:{cellWidth:8,halign:'center'}
-    },
-    alternateRowStyles:{fillColor:[248,250,252]},
-    didParseCell(data){
-      if(data.section==='body'){
-        const s=sorted[data.row.index];
-        if(!s)return;
-        if(s.isCut){
-          data.cell.styles.fillColor=[255,232,232];
-          return;
-        }
-        const [r,g,b]=DAY_RGB[(s.day-1)%DAY_RGB.length];
-        if(data.column.index===1) data.cell.styles.fillColor=[r,g,b];
-      }
-    },
-    margin:{left:10,right:10},
-    tableLineColor:[213,220,228],tableLineWidth:0.1,
-    didDrawPage(data){
-      // Footer
-      const pg=doc.internal.getCurrentPageInfo().pageNumber;
-      const tot='{total_pages_count_string}';
-      doc.setFontSize(7.5);doc.setTextColor(150,150,150);
-      doc.text(`Page ${pg} of ${tot}`,pw/2,doc.internal.pageSize.getHeight()-4,{align:'center'});
-      doc.text('MOP Generator — Auto Mode · Confidential',10,doc.internal.pageSize.getHeight()-4);
-    }
+function renderOverview() {
+  const st = STATES[DOM], r = R[DOM][TI], t = st.types[TI], P = st.project, TRM = DOM === "TRM";
+  const all = steps(r), maxMin = (+P.maxHours || 10) * 60;
+  const S = U.settings, ov = overrides();
+  const job = TRM ? M.TRM_METHODS[t.method].label : RAN_SC[t.scenario];
+  const units = (t.units || []).map(u => `<li>${u.qty}× ${esc(u.model)} <span class="who">${esc(u.role || "")}</span></li>`);
+  (t.basebands || []).forEach(b => units.push(`<li>${b.qty}× ${esc(b.model)} <span class="who">${b.status} · ${esc(b.tech)}</span></li>`));
+  (t.rbs || []).forEach(b => units.push(`<li>${b.qty}× ${esc(b.type)} <span class="who">cabinet</span></li>`));
+  const night = M.hm(P.outStart) < NIGHT && !r.noOutage;
+  const outTxt = r.noOutage ? "No outage" : `${M.clock(r.outStart)} → ${M.clock(r.outEnd)}`;
+  const ts = st.types;
+  let h = ts.length > 1 ? `<div class="card"><h3>${esc(P.name)} – ${ts.length} site types · ${ts.reduce((a, x) => a + x.sites, 0)} ${TRM ? "links" : "sites"}</h3><table class="types"><thead><tr><th>Site type</th><th>${TRM ? "Links" : "Sites"}</th><th>Equipment</th><th>Days</th><th>Steps</th><th>Outage</th><th></th></tr></thead><tbody>${ts.map((x, i) => {
+    const rr = R[DOM][i], eq = [...(x.units || []).map(u => `${u.qty}× ${u.model.replace(/^Radio /, "")}`), ...(x.basebands || []).map(b => `${b.qty}× ${b.model}${b.status === "Reused" ? " (R)" : ""}`)].join(", ");
+    return `<tr class="${i === TI ? "sel" : ""}" data-ti="${i}"><td>${esc(x.name)}</td><td>${x.sites}</td><td style="font-size:12px;color:var(--ink-2)">${esc(eq)}</td><td>${rr.days.length}</td><td>${steps(rr).length}</td><td>${rr.noOutage ? "—" : M.fmt(rr.outage) + " h"}</td><td>${rr.noOutage ? "" : `<span class="okpill ${rr.outOk ? "" : "bad"}">${rr.outOk ? "OK" : "Over"}</span>`}</td></tr>`; }).join("")}</tbody></table><p class="note">Click a row (or use the selector at the top) to see that type. Excel and PDF include all types.</p></div>` : "";
+  h += `<div class="stat-row">
+    <div class="stat"><div class="n" style="color:var(--blue)">${r.days.length}</div><div class="l">Days on site</div></div>
+    <div class="stat"><div class="n" style="color:var(--violet)">${all.length}</div><div class="l">Steps</div></div>
+    <div class="stat"><div class="n" style="color:var(--amber)">${M.fmt(r.total)}<small>h</small></div><div class="l">Total time on site</div></div>
+    <div class="stat"><div class="n" style="color:${r.outOk ? "var(--green)" : "var(--red)"}">${r.noOutage ? "—" : M.fmt(r.outage)}<small>${r.noOutage ? "" : "h"}</small></div><div class="l">Outage ${r.noOutage ? "(none)" : outTxt}</div></div>
+    <div class="stat"><div class="n" style="color:var(--teal)">${t.sites}</div><div class="l">${TRM ? "Links" : "Sites"} of this type</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>What was built</h3>
+      <ul class="ulist"><li><b>${esc(P.name)}</b>${P.country ? " · " + esc(P.country) : ""}</li><li>${TRM ? "TRM – MW link" : "RAN – site"} · ${esc(job)} · ${t.days} day${t.days > 1 ? "s" : ""}${+t.outageDay ? ` · outage on day ${t.outageDay}` : ""}</li>
+      ${!TRM ? `<li>Tower: ${esc(t.towerType)} ${t.towerHeight} m${+P.legacyRRU ? ` · dismantle ${P.legacyRRU} old RRUs` : ""}</li>` : `<li>${t.sd ? "Space diversity" : "No space diversity"}</li>`}</ul>
+      <div class="plabel" style="margin-top:10px">Equipment ${TRM ? "per link end" : "per site"}</div><ul class="ulist">${units.join("") || "<li>—</li>"}</ul>
+      ${Object.keys(ov).length ? `<p class="note">Your adjustments: ${Object.entries(ov).map(([k, v]) => `${k} = ${esc(v)}`).join(", ")}</p>` : ""}
+    </div>
+    <div class="card"><h3>Outage window</h3>
+      ${r.noOutage ? `<p>This job has no outage.</p>` : `
+      <p style="margin:0 0 8px"><span class="okpill ${r.outOk ? "" : "bad"}">${r.outOk ? "Fits the window" : "Runs past the window"}</span></p>
+      <ul class="ulist"><li>Approved: ${M.clock(r.outApproved)} → ${M.clock(r.allowedEnd)} (${P.outMax} h)</li><li>Planned: ${outTxt} (${M.fmt(r.outage)} h) on day ${r.cutIdx}</li>
+      <li>Team on site that day: ${M.clock(r.days[r.cutIdx - 1].arrive)}${r.days[r.cutIdx - 1].arrive >= 1440 - 360 || night ? " (night shift)" : ""}</li></ul>
+      ${night ? `<p class="note">Night window: the team arrives the evening before the outage day.</p>` : ""}
+      ${!r.outOk ? `<p class="note" style="color:var(--red)">Allow a longer outage, start it earlier, or open it in the editor to move steps out of the window.</p>` : ""}`}
+    </div>
+  </div>
+  <div class="card"><h3>Days</h3>`;
+  r.days.forEach((d, i) => {
+    const n = d.acts.filter(a => a.dur).length, pct = Math.min(100, d.hours / Math.max(maxMin, d.hours) * 100), mx = maxMin / Math.max(maxMin, d.hours) * 100;
+    h += `<div class="day-row"><div class="dhead"><b>Day ${i + 1}${d.cut ? " ⚡ outage" : ""}</b><span>${M.clock(d.arrive)} → ${M.clock(d.leave)} · ${M.fmt(d.hours)} h · ${n} steps${d.hours > maxMin ? ` · <b style="color:var(--red)">over ${P.maxHours} h</b>` : ""}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${d.cut ? "var(--red)" : DAYC[i % 6]}"></div><div class="bar-max" style="left:${mx}%" title="Max ${P.maxHours} h"></div></div></div>`;
   });
-  doc.putTotalPages('{total_pages_count_string}');
-  doc.save((proj.name||'AutoMOP').replace(/[^\w\-]/g,'_')+'_MOP.pdf');
-  toast('PDF downloaded.');
+  const crew = {}; all.forEach(({ a }) => String(a.who || "Team").split(/\s*[+&\/]\s*/).forEach(w => crew[w] = (crew[w] || 0) + a.dur));
+  const mc = Math.max(1, ...Object.values(crew));
+  h += `</div><div class="card"><h3>Who is busy</h3>` + Object.entries(crew).sort((a, b) => b[1] - a[1]).map(([w, m]) =>
+    `<div class="crew-row"><div class="crew-dot" style="background:${whoC(w)}"></div><div class="crew-name" title="${esc(w)}">${esc(w)}</div><div class="crew-bar-wrap"><div class="crew-bar-inner" style="width:${m / mc * 100}%;background:${whoC(w)}"></div></div><div class="crew-hrs">${M.fmt(m)} h</div></div>`).join("") + `</div>`;
+  $("#v-overview").innerHTML = h;
+}
+$("#v-overview").addEventListener("click", e => { const tr = e.target.closest("tr[data-ti]"); if (!tr) return; TI = +tr.dataset.ti; renderAll(); });
+
+function renderTimeline() {
+  const r = R[DOM][TI];
+  let h = `<div class="legend"><span><i style="background:#D94141"></i>Outage</span><span><i style="background:#F2A20C"></i>Tower / riggers</span><span><i style="background:#3F6FD8"></i>Ground</span><span><i style="background:#0F766E"></i>FE / TX</span><span><i style="background:#8B5CF6"></i>Integrator / NOC</span><span><i style="background:#2F9E44"></i>Team lead / all</span></div>`;
+  r.days.forEach((d, i) => {
+    const s0 = d.arrive, span = Math.max(60, d.leave - s0), tick = span <= 240 ? 30 : span <= 600 ? 60 : 120;
+    let sc = ""; for (let m = Math.ceil(s0 / tick) * tick; m <= d.leave; m += tick) sc += `<span style="left:${(m - s0) / span * 100}%">${M.clock(m)}</span>`;
+    const win = d.cut && !r.noOutage ? `<div class="gantt-win" style="left:${(r.outApproved - s0) / span * 100}%;width:${(r.allowedEnd - r.outApproved) / span * 100}%"></div>` : "";
+    h += `<div class="gantt-day"><div class="gantt-dhead"><b>Day ${i + 1}${d.cut ? " ⚡ outage" : ""}</b><span>${M.clock(d.arrive)} → ${M.clock(d.leave)} · ${M.fmt(d.hours)} h</span></div><div class="gantt-scale">${sc}</div>`;
+    d.acts.forEach((a, k) => {
+      if (!a.dur) return;
+      const bg = a.impact === "Outage" ? "#D94141" : whoC(a.who);
+      h += `<div class="gantt-step"><div class="gantt-name" title="${esc(a.name)} – ${esc(a.who)}"><em>${i + 1}.${k + 1}</em>${esc(a.name)}</div>
+        <div class="gantt-track">${win}<div class="gantt-bar" style="left:${(a.start - s0) / span * 100}%;width:${a.dur / span * 100}%;background:${bg}" title="${M.clock(a.start)}–${M.clock(a.end)} · ${esc(a.who)}">${a.dur >= 30 ? M.clock(a.start) : ""}</div></div></div>`;
+    });
+    h += `</div>`;
+  });
+  $("#v-timeline").innerHTML = h;
 }
 
-function dlBlob(blob,name){
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
-  document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+function renderSteps() {
+  const r = R[DOM][TI];
+  let rows = "";
+  r.days.forEach((d, i) => {
+    rows += `<tr class="dayrow"><td colspan="7">Day ${i + 1}${d.cut ? " ⚡ outage" : ""} · ${M.clock(d.arrive)} → ${M.clock(d.leave)}</td></tr>`;
+    d.acts.forEach((a, k) => {
+      if (!a.dur) return;
+      const id = `${DOM}|${TI}|${i + 1}.${k + 1}|${a.key}`;
+      rows += `<tr class="${a.impact === "Outage" ? "out" : ""} ${DONE[id] ? "done" : ""}" data-txt="${esc((a.name + " " + a.desc + " " + a.who).toLowerCase())}">
+        <td class="num">${i + 1}.${k + 1}</td><td class="time">${M.clock(a.start)}–${M.clock(a.end)}</td>
+        <td class="nm"><b>${esc(a.name)}</b>${a.desc ? `<div class="desc">${esc(a.desc)}</div>` : ""}${a.rem ? `<div class="rem">⚑ ${esc(a.rem)}</div>` : ""}</td>
+        <td class="who"><span class="crew-dot" style="display:inline-block;background:${whoC(a.who)};margin-right:5px"></span>${esc(a.who)}</td>
+        <td class="time">${M.fmt(a.dur)}</td><td><span class="ipill ${esc(a.impact || "Non-SA")}">${esc(a.impact || "Non-SA")}</span></td>
+        <td><input type="checkbox" class="chk" data-id="${esc(id)}" ${DONE[id] ? "checked" : ""} aria-label="Done"></td></tr>`;
+    });
+  });
+  $("#v-steps").innerHTML = `<div class="tools"><input type="search" id="flt" placeholder="Filter steps…"><span class="prog-txt" id="prg"></span></div>
+    <div class="tbl-wrap"><table class="exec"><thead><tr><th>#</th><th>Time</th><th>Step</th><th>Who</th><th>Dur.</th><th>Impact</th><th>✓</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  prog();
 }
+function prog() { const all = $$("#v-steps .chk"), n = all.filter(c => c.checked).length, p = $("#prg"); if (p) { p.textContent = `${n}/${all.length} done`; p.classList.toggle("all", n && n === all.length); } }
+$("#v-steps").addEventListener("change", e => { const c = e.target.closest(".chk"); if (!c) return; if (c.checked) DONE[c.dataset.id] = 1; else delete DONE[c.dataset.id]; c.closest("tr").classList.toggle("done", c.checked); prog(); });
+$("#v-steps").addEventListener("input", e => { if (e.target.id !== "flt") return; const q = e.target.value.trim().toLowerCase(); $$("#v-steps tbody tr:not(.dayrow)").forEach(tr => tr.hidden = !!q && !tr.dataset.txt.includes(q)); });
 
-// ════════════════════════════════════════════════
-//  TOAST & VIEW
-// ════════════════════════════════════════════════
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),3000);}
-
-let curView='dashboard';
-function switchView(v){
-  curView=v;
-  document.querySelectorAll('.vtab').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
-  ['dashboard','gantt','table'].forEach(n=>document.getElementById('v-'+n).hidden=n!==v);
-}
-document.querySelectorAll('.vtab').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.v)));
-
-// ════════════════════════════════════════════════
-//  MAIN
-// ════════════════════════════════════════════════
-let ST=[],PROJ={};
-
-document.getElementById('btn-gen').addEventListener('click',()=>{
-  const raw=document.getElementById('eq-text').value;
-  const items=parseText(raw);
-  if(!items.length){toast('Type at least one equipment item.');return;}
-  const maxMin=parseInt(document.getElementById('o-maxh').value)||480;
-  const cutDay=parseInt(document.getElementById('o-cutover').value)||0;
-  const startTS=document.getElementById('o-start').value||'07:00';
-  PROJ={name:document.getElementById('p-name').value.trim(),country:document.getElementById('p-country').value.trim()};
-
-  const unk=items.filter(it=>!it.equipKey);
-  if(unk.length) toast(`Note: ${unk.map(u=>u.modelRaw).join(', ')} — using generic steps.`);
-
-  const steps=buildSteps(items);
-  planDays(steps,maxMin,cutDay);
-  ST=steps;
-
-  document.getElementById('pg-setup').hidden=true;
-  document.getElementById('pg-mop').hidden=false;
-  renderDash(steps,cutDay,maxMin);
-  renderGantt(steps,cutDay,startTS);
-  renderTable(steps);
-  switchView('dashboard');
-});
-
-document.getElementById('btn-edit').addEventListener('click',()=>{
-  document.getElementById('pg-mop').hidden=true;
-  document.getElementById('pg-setup').hidden=false;
-});
-
-document.getElementById('btn-xl').addEventListener('click',async()=>{
-  const b=document.getElementById('btn-xl');b.disabled=true;b.textContent='…';
-  await exportXL(ST,PROJ);
-  b.disabled=false;b.textContent='Excel';
-});
-document.getElementById('btn-pdf').addEventListener('click',async()=>{
-  const b=document.getElementById('btn-pdf');b.disabled=true;b.textContent='…';
-  await exportPDF(ST,PROJ);
-  b.disabled=false;b.textContent='PDF';
-});
+// ===================== outputs (same engine as the main editor) =====================
+const fileBase = st => [st.project.name || "MOP", st.project.country].filter(Boolean).join(" ").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_");
+function dl(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+$("#btn-xl").onclick = async () => {
+  if (!window.ExcelJS) { toast("The Excel library did not load. Reload the page."); return; }
+  const b = $("#btn-xl"); b.disabled = true; b.textContent = "Building…";
+  try { const st = forEngine(STATES[DOM]); const wb = await M.buildWorkbook(window.ExcelJS, st); const buf = await wb.xlsx.writeBuffer();
+    dl(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${fileBase(st)}_${DOM}_Installation_MOP.xlsx`); toast("Excel MOP downloaded."); }
+  catch (e) { console.error(e); toast("Could not build the Excel file: " + (e.message || e)); }
+  b.disabled = false; b.textContent = "Excel";
+};
+$("#btn-pdf").onclick = () => {
+  if (!window.jspdf || !window.jspdf.jsPDF) { toast("The PDF library did not load. Reload the page."); return; }
+  try { const st = forEngine(STATES[DOM]); const doc = M.buildPdf(window.jspdf.jsPDF, st); dl(doc.output("blob"), `${fileBase(st)}_${DOM}_MOP_summary.pdf`); toast("PDF MOP downloaded."); }
+  catch (e) { console.error(e); toast("Could not build the PDF: " + (e.message || e)); }
+};
+$("#btn-ckl").onclick = () => {
+  const st = STATES[DOM], r = R[DOM][TI], t = st.types[TI], P = st.project;
+  let h = `<div class="ckl-act"><button class="p" onclick="window.print()">Print / Save PDF</button><button onclick="this.closest('.ckl').remove()">Close</button></div>
+    <h1>${esc(P.name)} – ${esc(t.name)}</h1><div class="meta">${DOM} · ${t.sites} ${DOM === "TRM" ? "links" : "sites"} · ${r.noOutage ? "no outage" : `outage ${M.clock(r.outStart)}–${M.clock(r.outEnd)} on day ${r.cutIdx}`} · Site ID: ____________ · Team lead: ____________ · Date: ____________</div>`;
+  r.days.forEach((d, i) => {
+    h += `<h2>Day ${i + 1}${d.cut ? " – OUTAGE" : ""} · ${M.clock(d.arrive)} → ${M.clock(d.leave)}</h2>`;
+    d.acts.forEach((a, k) => { if (!a.dur) return; h += `<div class="st"><span class="box"></span><div><b>${i + 1}.${k + 1} ${esc(a.name)}</b> · ${M.clock(a.start)}–${M.clock(a.end)} · ${esc(a.who)}${a.impact === "Outage" ? " · <b>OUTAGE</b>" : ""}<small>${esc(a.desc || "")}${a.rem ? " — " + esc(a.rem) : ""}</small></div></div>`; });
+  });
+  const ov = document.createElement("div"); ov.className = "ckl"; ov.innerHTML = h; document.body.appendChild(ov);
+};
+$("#btn-open").onclick = () => {
+  const KEY = "mop-generator-v2"; let ALL = null;
+  try { ALL = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) {}
+  if (!ALL || typeof ALL !== "object") ALL = { mode: DOM, RAN: null, TRM: null };
+  if (!ALL.RAN || !ALL.RAN.types) ALL.RAN = DOM === "RAN" ? null : M.DEFAULT_STATE(); // the editor needs a RAN setup to exist
+  const mine = JSON.parse(JSON.stringify(STATES[DOM])), cur = ALL[DOM];
+  if (mine.types.length > 1 && cur && Array.isArray(cur.types) && cur.types.length) {
+    if (!confirm(`Open these ${mine.types.length} site types as your ${DOM} setup in the editor?\n\nYour current ${DOM} setup is downloaded as a backup file first (Load setup brings it back).`)) return;
+    dl(new Blob([JSON.stringify(cur, null, 1)], { type: "application/json" }), `${DOM}_setup_backup_${new Date().toISOString().slice(0, 10)}.json`);
+    ALL[DOM] = mine;
+  } else if (cur && Array.isArray(cur.types) && cur.types.length) { // keep the user's work: add this MOP as one more type
+    const t = mine.types[0]; let nm = t.name, n = 2; while (cur.types.some(x => x.name === nm)) nm = `${t.name} (${n++})`; t.name = nm;
+    cur.types.push(t); mine.equipment.forEach(e => { if (!cur.equipment.some(x => x.model === e.model)) cur.equipment.push(e); });
+    toast(`Added “${nm}” to your ${DOM} setup.`);
+  } else { ALL[DOM] = mine; toast(`Opened as a new ${DOM} setup.`); }
+  ALL.mode = DOM;
+  try { localStorage.setItem(KEY, JSON.stringify(ALL)); } catch (e) { toast("Could not save to this browser."); return; }
+  setTimeout(() => location.href = "index.html", 600);
+};
+refresh();
 </script>
 </body>
 </html>
