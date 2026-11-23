@@ -138,6 +138,8 @@ body:not([data-mode="TRM"]) .trm-only{display:none!important}
 .seg{display:inline-flex;background:rgba(255,255,255,.08);border:1px solid #5E7185;border-radius:7px;padding:3px;gap:3px}
 .seg button{background:transparent;border:0;color:#C9D3DE;font:700 14px/1 var(--cond);padding:9px 14px;border-radius:5px;cursor:pointer}
 .seg button[aria-selected="true"]{background:var(--amber);color:var(--amber-ink)}
+.seg .seg-auto{display:inline-flex;align-items:center;color:#C9D3DE;font:700 14px/1 var(--cond);padding:9px 14px;border-radius:5px;text-decoration:none;border-left:1px solid #5E7185;margin-left:2px}
+.seg .seg-auto:hover{background:rgba(242,162,12,.15);color:var(--amber)}
 .start{position:fixed;inset:0;z-index:20;background:rgba(15,21,28,.72);display:grid;place-items:center;padding:20px}
 .start[hidden]{display:none}
 .startbox{background:var(--panel);color:var(--ink);border-radius:12px;max-width:720px;width:100%;padding:28px}
